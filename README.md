@@ -53,6 +53,8 @@ bun .\scripts\skyagent.ts inventory
 bun .\scripts\skyagent.ts inventory-section armor
 bun .\scripts\skyagent.ts item-dump --section accessory_bag
 bun .\scripts\skyagent.ts normalize-items
+bun .\scripts\skyagent.ts networth
+bun .\scripts\skyagent.ts item-networth --section armor
 bun .\scripts\skyagent.ts item HYPERION
 bun .\scripts\skyagent.ts price ENCHANTED_DIAMOND
 bun .\scripts\skyagent.ts lbin HYPERION
@@ -92,7 +94,9 @@ Item metadata uses the NotEnoughUpdates item repository as an optional provider.
 
 Price results use Hypixel Bazaar for Bazaar products and CoflNet-compatible endpoints for LBIN/history. Bounded Hypixel active-auction scans can expose partial `candidatePrice` metadata for auctionable items, but only complete scans or direct providers populate resolved `price`. Outputs include provider method, confidence, cache status, stale status, fallback chain, and warnings.
 
-See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, and `docs/parity-spec.md` for the detailed missing-parity implementation spec.
+Networth results combine purse, bank, and sectioned inventory item totals. Items without resolved prices are reported under `unknownPrices` and do not contribute to totals; partial auction candidates remain advisory. Current networth behavior is intentionally conservative: item modifiers and cosmetic/value add-ons are preserved in output but not independently valued until provider-specific support lands.
+
+See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, `docs/parity-spec.md` for the detailed missing-parity implementation spec, and `docs/networth-comparison.md` for networth comparison-smoke notes.
 
 ## CI
 

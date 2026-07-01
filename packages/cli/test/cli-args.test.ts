@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { command, parseInventoryArgs, parseItemDumpArgs } from "../src/index.ts";
+import { command, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs } from "../src/index.ts";
 
 let tempHome: string | null = null;
 
@@ -36,6 +36,13 @@ describe("CLI argument parsing", () => {
       section: "accessory_bag",
       values: [],
       debugRaw: true,
+    });
+  });
+
+  test("item-networth accepts player and profile around --section", () => {
+    expect(parseItemNetworthArgs(["Notch", "Apple", "--section", "armor"])).toEqual({
+      section: "armor",
+      values: ["Notch", "Apple"],
     });
   });
 });

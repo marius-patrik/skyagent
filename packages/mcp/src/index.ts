@@ -4,6 +4,7 @@ import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } f
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
+import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 
@@ -176,6 +177,32 @@ const tools = [
         player: { type: "string" },
         profile: { type: "string" },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_networth",
+    description: "Calculate sectioned SkyBlock profile networth with purse, bank, item totals, unknown prices, provider freshness, assumptions, and confidence. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_item_networth",
+    description: "Calculate networth for one inventory section such as inventory, armor, equipment, wardrobe, ender_chest, backpacks, accessory_bag, personal_vault, or pets. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        section: { type: "string" },
+        player: { type: "string" },
+        profile: { type: "string" },
+      },
+      required: ["section"],
       additionalProperties: false,
     },
   },
@@ -416,6 +443,10 @@ async function callTool(name: string, args: Record<string, any> = {}) {
     }
     case "skyblock_normalized_items":
       return normalizedItemsForPlayer(args.player, args.profile);
+    case "skyblock_networth":
+      return networthForPlayer(args.player, args.profile);
+    case "skyblock_item_networth":
+      return itemNetworthForPlayer(args.player, args.profile, args.section);
     case "skyblock_item_metadata":
       return itemMetadata(args.internalId);
     case "skyblock_price":
