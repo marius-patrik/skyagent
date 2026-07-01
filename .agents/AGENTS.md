@@ -65,5 +65,12 @@ codex plugin add skyagent@personal
 ## Git
 
 - Keep `main` deployable.
+- Do not implement directly on `main`.
+- Create a corresponding GitHub issue before starting each slice of work.
+- The issue must include the exact spec and acceptance criteria for that slice.
+- Do each slice on a feature/dev branch named for the issue, such as `dev/issue-12-short-topic`.
+- Land each slice to `main` through a PR from the dev branch.
+- The PR must close the corresponding issue on merge.
+- Main should receive one commit per slice. Use a single focused commit on the branch or squash-merge the PR.
 - Commit focused changes with concise messages.
-- Push completed repo-rule, plugin, CLI, MCP, and skill changes to `origin/main`.
+- Push completed repo-rule, plugin, CLI, MCP, and skill changes to the dev branch, then open a PR.
