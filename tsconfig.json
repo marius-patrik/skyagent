@@ -26,7 +26,7 @@
         "packages/mcp/src/index.ts"
       ],
       "@skyagent/tui": [
-        "packages/tui/src/index.ts"
+        "packages/tui/src/index.tsx"
       ],
       "@skyagent/web": [
         "packages/web/src/main.tsx"

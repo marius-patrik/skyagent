@@ -1,11 +1,12 @@
 import path from "node:path";
 import { expect, test } from "bun:test";
-import { tuiSnapshot, tuiStatus } from "../src/index.ts";
+import { SkyAgentTuiApp, tuiSnapshot, tuiStatus } from "../src/index.tsx";
 
 test("tui status initializes without live credentials", () => {
   const status = tuiStatus();
 
   expect(status.surface).toBe("tui");
+  expect(status.renderer).toBe("ink");
   expect(status.ready).toBe(true);
   expect(status.config.apiKeyConfigured).toBeTypeOf("boolean");
 });
@@ -20,6 +21,11 @@ test("tui smoke snapshot exposes screens and does not print secrets", () => {
   expect(snapshot.shortcuts).toContain("up/down or j/k");
   expect(snapshot.shortcuts).toContain("left/right or h/l");
   expect(snapshot.secrets).toContain("never printed");
+  expect(snapshot.renderer).toBe("ink");
+});
+
+test("tui exports an Ink-backed React app surface", () => {
+  expect(SkyAgentTuiApp).toBeTypeOf("function");
 });
 
 test("root skyagent script delegates tui smoke mode", async () => {

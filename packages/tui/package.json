@@ -6,12 +6,17 @@
     "skyagent-tui": "./src/bin.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.tsx"
   },
   "scripts": {
     "start": "bun ./src/bin.ts"
   },
   "dependencies": {
-    "@skyagent/core": "workspace:*"
+    "@skyagent/core": "workspace:*",
+    "ink": "^7.1.0",
+    "react": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17"
   }
 }
