@@ -6,6 +6,19 @@ This repository builds a Codex plugin, CLI, and MCP server for Hypixel SkyBlock 
 
 Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui. Defer additional framework, state, styling, deployment, and database choices until the web app requirements are clear.
 
+Do not implement web app work unless the user explicitly requests it for the current issue. Existing web stack notes are constraints for approved web work, not permission to start it.
+
+Do not implement Minecraft mod or mcmod work unless the user explicitly requests it and a dedicated issue spec exists.
+
+## Operating Mode
+
+- Work issue-first. Do not implement a slice until a GitHub issue exists with the exact spec, non-goals, acceptance criteria, and validation commands.
+- Treat the issue spec as the contract. If implementation reveals missing scope, update or split the issue before coding beyond it.
+- Execute implementation issues sequentially. Finish, merge, or explicitly park the current issue before starting another implementation slice.
+- Use the full delivery loop for each slice: issue spec, dev branch, implementation, validation, PR, CI/Codex Review, merge to `main`, then next issue.
+- Use subagents for bounded sidecar research, implementation, review, test investigation, or parallel inspection when they materially improve throughput. Keep final implementation ownership, integration, and merge decisions coordinated by the primary agent.
+- Prefer spec-driven development: write or update the expected behavior and validation target before broad implementation, then keep code changes scoped to that spec.
+
 ## Source Priority
 
 - Prefer official Hypixel API data and official Hypixel docs for endpoint behavior.
@@ -33,6 +46,7 @@ Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui. D
 - Keep MCP tool schemas and dispatch in `packages/mcp/src/`; `scripts/mcp-server.ts` is only a compatibility wrapper.
 - Keep interactive terminal UI work in `packages/tui/` and depend on `@skyagent/core`; do not import CLI or MCP internals.
 - Keep web app work in `packages/web/` using Bun, Rsbuild, React, TypeScript, and shadcn/ui conventions; depend on `@skyagent/core` rather than importing CLI, MCP, or TUI internals.
+- Treat web app and Minecraft mod implementation as deferred work unless the current issue explicitly authorizes that surface.
 
 ## Skillset Maintenance
 
@@ -87,6 +101,8 @@ codex plugin add skyagent@personal
 - Land each slice to `main` through a PR from the dev branch.
 - The PR must close the corresponding issue on merge.
 - Main should receive one commit per slice. Use a single focused commit on the branch or squash-merge the PR.
+- Do not batch unrelated issues into one branch or PR.
+- Do not start the next issue's implementation until the previous issue has merged, unless the user explicitly asks to run issues in parallel.
 - Add the `automerge` label only when a PR is intended to merge automatically after CI and Codex autoreview pass.
 - Codex autoreview uses the GitHub secret `CODEX_AUTH_JSON`, containing Codex OAuth `auth.json`; do not use `OPENAI_API_KEY` for this repo's Codex CI review.
 - Keep the Codex autoreview runtime bundled in `.github/codex-review.Dockerfile` instead of installing Codex ad hoc in the workflow.
