@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Codex plugin, CLI, and MCP tools for Hypixel SkyBlock profile analysis.",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "skyagent": "./scripts/skyagent.ts"
   },
@@ -15,6 +18,11 @@
     "validate:skill": "bun ./scripts/ci/validate-skill.ts"
   },
   "license": "MIT",
+  "dependencies": {
+    "@skyagent/cli": "workspace:*",
+    "@skyagent/core": "workspace:*",
+    "@skyagent/mcp": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^26.0.1",
     "typescript": "^6.0.3"

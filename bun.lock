@@ -4,13 +4,45 @@
   "workspaces": {
     "": {
       "name": "skyagent",
+      "dependencies": {
+        "@skyagent/cli": "workspace:*",
+        "@skyagent/core": "workspace:*",
+        "@skyagent/mcp": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^26.0.1",
         "typescript": "^6.0.3",
       },
     },
+    "packages/cli": {
+      "name": "@skyagent/cli",
+      "version": "0.1.0",
+      "bin": {
+        "skyagent": "./src/bin.ts",
+      },
+      "dependencies": {
+        "@skyagent/core": "workspace:*",
+      },
+    },
+    "packages/core": {
+      "name": "@skyagent/core",
+      "version": "0.1.0",
+    },
+    "packages/mcp": {
+      "name": "@skyagent/mcp",
+      "version": "0.1.0",
+      "dependencies": {
+        "@skyagent/core": "workspace:*",
+      },
+    },
   },
   "packages": {
+    "@skyagent/cli": ["@skyagent/cli@workspace:packages/cli"],
+
+    "@skyagent/core": ["@skyagent/core@workspace:packages/core"],
+
+    "@skyagent/mcp": ["@skyagent/mcp@workspace:packages/mcp"],
+
     "@types/node": ["@types/node@26.0.1", "", { "dependencies": { "undici-types": "~8.3.0" } }, "sha512-fc3KiUoBt6kie0N9bIW3E47vZsuaMf0PM2AaUpLCLT0s/LvX1nxAim6Fc049cNxODPpGm6qRAuUOB86SkRuPQw=="],
 
     "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],

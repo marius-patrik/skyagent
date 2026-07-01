@@ -13,9 +13,12 @@ The goal is to connect Codex to live player data, game reference data, and curat
 
 - `skills/` contains durable SkyBlock reasoning rules and source-priority guidance.
 - `.mcp.json` exposes local tools for Hypixel API calls, profile data, public SkyBlock resources, and persistent SkyAgent notes.
-- `scripts/skyagent.ts` is the Bun-powered CLI.
-- `scripts/mcp-server.ts` is the Bun-powered MCP server used by Codex.
+- `packages/core` contains shared Hypixel/Mojang API clients, profile helpers, config, memories, and future parsers/calculators.
+- `packages/cli` contains the Bun-powered JSON CLI command implementation.
+- `packages/mcp` contains the Bun-powered MCP server used by Codex.
+- `scripts/skyagent.ts` and `scripts/mcp-server.ts` are compatibility wrappers for the root binary and plugin manifest.
 - `assets/` is reserved for plugin assets and reference fixtures.
+- Future TUI work should add a package that depends on `@skyagent/core`.
 - Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui.
 
 ## Local Setup

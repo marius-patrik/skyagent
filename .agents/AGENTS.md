@@ -24,12 +24,14 @@ Future web app work should use Bun, Rsbuild, React, TypeScript, and shadcn/ui. D
 ## Architecture
 
 - Prefer TypeScript over JavaScript whenever possible.
-- Keep transport/API code in `scripts/lib/hypixel.ts`.
-- Keep user config and memory persistence in `scripts/lib/store.ts`.
-- Keep profile-level extraction and SkyCrypt-style viewer helpers in `scripts/lib/profile.ts`.
-- Keep CLI command wiring in `scripts/skyagent.ts`.
-- Keep MCP tool schemas and dispatch in `scripts/mcp-server.ts`.
-- Add new parser/calculator modules under `scripts/lib/` before expanding CLI/MCP wiring.
+- Keep shared transport/API code in `packages/core/src/hypixel.ts`.
+- Keep user config and memory persistence in `packages/core/src/store.ts`.
+- Keep profile-level extraction and SkyCrypt-style viewer helpers in `packages/core/src/profile.ts`.
+- Add new parser/calculator modules under `packages/core/src/` before expanding CLI/MCP/TUI/web wiring.
+- Keep CLI command wiring in `packages/cli/src/`; `scripts/skyagent.ts` is only a compatibility wrapper.
+- Keep MCP tool schemas and dispatch in `packages/mcp/src/`; `scripts/mcp-server.ts` is only a compatibility wrapper.
+- Future TUI work should use its own package and depend on `@skyagent/core`.
+- Future web app work should use its own package and depend on `@skyagent/core` rather than importing CLI or MCP internals.
 
 ## API and Tool Design
 

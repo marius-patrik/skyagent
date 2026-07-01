@@ -1,0 +1,14 @@
+{
+  "name": "@skyagent/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "skyagent": "./src/bin.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@skyagent/core": "workspace:*"
+  }
+}

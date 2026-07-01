@@ -1,0 +1,11 @@
+{
+  "name": "@skyagent/core",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hypixel": "./src/hypixel.ts",
+    "./profile": "./src/profile.ts",
+    "./store": "./src/store.ts"
+  }
+}

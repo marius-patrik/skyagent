@@ -56,7 +56,7 @@ Treat these as parity references. Official Hypixel API data remains the source o
 
 ### Provider Rules
 
-- Each provider must have a module-level adapter under `scripts/lib/`.
+- Each provider must have a module-level adapter under `packages/core/src/`.
 - Each adapter must return provider metadata: source name, fetched URL or local version, fetched time, and cache status.
 - Cache public metadata and economy responses with explicit TTLs.
 - Keep user profile data uncached by default unless the user explicitly asks for snapshots.
@@ -80,9 +80,9 @@ Decode Hypixel SkyBlock inventory payloads and extract item stacks from:
 
 ### Implementation
 
-- Add `scripts/lib/nbt.ts` for base64 + gzip + NBT parsing.
+- Add `packages/core/src/nbt.ts` for base64 + gzip + NBT parsing.
 - Prefer a maintained NBT parser package over hand-rolling the binary format.
-- Add `scripts/lib/inventory.ts` for section extraction and item stack normalization.
+- Add `packages/core/src/inventory.ts` for section extraction and item stack normalization.
 - Preserve raw decoded data behind a debug option.
 
 ### CLI
@@ -129,7 +129,7 @@ Fields should include:
 
 ### Implementation
 
-- Add `scripts/lib/items.ts`.
+- Add `packages/core/src/items.ts`.
 - Add provider adapter for NotEnoughUpdates-style metadata.
 - Keep normalization deterministic and side-effect free.
 
@@ -163,7 +163,7 @@ Resolve item value using multiple sources:
 
 ### Implementation
 
-- Add `scripts/lib/prices.ts`.
+- Add `packages/core/src/prices.ts`.
 - Add provider adapters for Hypixel Bazaar/Auctions and CoflNet-compatible endpoints.
 - Add price strategy metadata: provider, method, confidence, timestamp, and fallback chain.
 - Cache public price data separately from user data.
@@ -208,7 +208,7 @@ Calculate total and per-section networth:
 
 ### Implementation
 
-- Add `scripts/lib/networth.ts`.
+- Add `packages/core/src/networth.ts`.
 - Start with SkyHelper-Networth-compatible behavior where license and integration constraints allow.
 - Output section totals, item totals, ignored items, unknown prices, and provider assumptions.
 - Include confidence and stale-data warnings.
@@ -245,7 +245,7 @@ Identify missing accessories and rank upgrades by expected value:
 
 ### Implementation
 
-- Add `scripts/lib/accessories.ts`.
+- Add `packages/core/src/accessories.ts`.
 - Use maintained accessory metadata and price provider.
 - Separate exact calculations from estimates when API data is incomplete.
 
@@ -290,8 +290,8 @@ Render progression sections similar to profile viewers and bots:
 
 ### Implementation
 
-- Add section modules under `scripts/lib/sections/`.
-- Add shared XP curve utilities under `scripts/lib/progression.ts`.
+- Add section modules under `packages/core/src/sections/`.
+- Add shared XP curve utilities under `packages/core/src/progression.ts`.
 - Keep each section independently testable.
 
 ### CLI
@@ -325,8 +325,8 @@ Add derived meta calculators:
 
 ### Implementation
 
-- Add `scripts/lib/weight.ts`.
-- Add `scripts/lib/readiness.ts`.
+- Add `packages/core/src/weight.ts`.
+- Add `packages/core/src/readiness.ts`.
 - Every output must name formulas and assumptions.
 - If formulas are stale or unavailable, output an explicit unsupported/estimate status.
 
@@ -361,7 +361,7 @@ Turn profile state and calculators into action plans:
 
 ### Implementation
 
-- Add `scripts/lib/planner.ts`.
+- Add `packages/core/src/planner.ts`.
 - Use structured inputs from sections, networth, prices, and memories.
 - Keep recommendation logic explainable: every recommendation should include reason, expected impact, cost/time estimate, prerequisites, and source freshness.
 

@@ -10,11 +10,28 @@
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@skyagent/cli": [
+        "packages/cli/src/index.ts"
+      ],
+      "@skyagent/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@skyagent/core/*": [
+        "packages/core/src/*.ts"
+      ],
+      "@skyagent/mcp": [
+        "packages/mcp/src/index.ts"
+      ]
+    },
     "types": [
       "node"
     ]
   },
   "include": [
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "packages/**/*.ts"
   ]
 }
