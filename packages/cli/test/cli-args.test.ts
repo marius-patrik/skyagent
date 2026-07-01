@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
 import { command, doctorStatus, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseSetupArgs } from "../src/index.ts";
+import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
 
@@ -116,6 +117,74 @@ describe("CLI argument parsing", () => {
         arch: process.arch,
       },
     });
+  });
+
+  test("update commands parse flags and select compatible release artifact without installing", async () => {
+    isolatedSkyAgentHome();
+    const target = process.platform === "win32"
+      ? "windows-x64"
+      : process.platform === "darwin" && process.arch === "arm64"
+        ? "darwin-arm64"
+        : process.platform === "darwin"
+          ? "darwin-x64"
+          : "linux-x64";
+    const metadata = {
+      version: "1.2.3",
+      tag: "v1.2.3",
+      assets: [{ name: `skyagent-${target}.zip`, sha256: "abc123", size: 42 }],
+    };
+    const fetchText = async (url: string) => url.endsWith("SHA256SUMS.txt")
+      ? `abc123  skyagent-${target}.zip\n`
+      : JSON.stringify(metadata);
+
+    expect(parseUpdateArgs(["--json", "--version", "1.2.3", "--dry-run", "--restart", "all"])).toEqual({
+      json: true,
+      dryRun: true,
+      version: "1.2.3",
+      restart: "all",
+    });
+    await expect(updatePlan({ version: "1.2.3", fetchText })).resolves.toMatchObject({
+      latestVersion: "1.2.3",
+      tag: "v1.2.3",
+      target,
+      asset: { name: `skyagent-${target}.zip`, sha256: "abc123" },
+    });
+    const standalonePath = path.join(os.tmpdir(), process.platform === "win32" ? "skyagent.exe" : "skyagent");
+    await expect(installUpdate({
+      version: "1.2.3",
+      fetchText,
+      dryRun: true,
+      installPath: standalonePath,
+      validateInstallPath: async () => ({ version: "0.1.0" }),
+    })).resolves.toMatchObject({
+      dryRun: true,
+      latestVersion: "1.2.3",
+      target,
+    });
+    expect(() => parseUpdateArgs(["--version"])).toThrow("--version requires a version value");
+    expect(() => parseUpdateArgs(["--dryrun"])).toThrow("Unknown update flag");
+    expect(() => parseUpdateArgs(["extra"])).toThrow("Unexpected update argument");
+    await expect(installUpdate({
+      fetchText: async (url: string) => url.endsWith("SHA256SUMS.txt")
+        ? `abc123  skyagent-${target}.zip\n`
+        : JSON.stringify({ ...metadata, version: "0.1.0", tag: "v0.1.0" }),
+      installPath: path.join(os.tmpdir(), process.platform === "win32" ? "skyagent.exe" : "skyagent"),
+      validateInstallPath: async () => ({ version: "0.1.0" }),
+    })).rejects.toThrow("already up to date");
+    await expect(installUpdate({
+      version: "1.2.3",
+      fetchText,
+      installPath: path.resolve(import.meta.dir, "../../../scripts/skyagent.ts"),
+      dryRun: true,
+      validateInstallPath: async () => ({ version: "0.1.0" }),
+    })).rejects.toThrow("non-standalone install path");
+    await expect(installUpdate({
+      version: "1.2.3",
+      fetchText,
+      installPath: path.join(os.tmpdir(), process.platform === "win32" ? "skyagent.exe" : "skyagent"),
+      dryRun: true,
+      validateInstallPath: async () => ({ version: "0.1.0" }),
+    })).resolves.toMatchObject({ dryRun: true, installTarget: { version: "0.1.0" } });
   });
 
   test("root skyagent script delegates plan command to CLI", async () => {
