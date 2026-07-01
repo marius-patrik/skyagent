@@ -4,6 +4,7 @@ import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setCon
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
+import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 
@@ -33,6 +34,8 @@ Usage:
   skyagent inventory-section <section> [nameOrUuid] [profileIdOrName] [--debug-raw]
   skyagent item-dump [nameOrUuid] [profileIdOrName] --section <section> [--debug-raw]
   skyagent normalize-items [nameOrUuid] [profileIdOrName]
+  skyagent networth [nameOrUuid] [profileIdOrName]
+  skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section>
   skyagent item <internalId>
   skyagent price <itemId>
   skyagent lbin <itemId>
@@ -107,6 +110,14 @@ export function parseItemDumpArgs(args) {
     section,
     values: positionalArgs(args, ["--section"]),
     debugRaw: args.includes("--debug-raw"),
+  };
+}
+
+export function parseItemNetworthArgs(args) {
+  const section = optionValue(args, "--section");
+  return {
+    section,
+    values: positionalArgs(args, ["--section"]),
   };
 }
 
@@ -260,6 +271,22 @@ export async function command(args) {
   if (area === "normalize-items") {
     const values = withoutFlags([action, ...rest].filter(Boolean));
     print(await normalizedItemsForPlayer(values[0], values[1]));
+    return;
+  }
+
+  if (area === "networth") {
+    const values = withoutFlags([action, ...rest].filter(Boolean));
+    print(await networthForPlayer(values[0], values[1]));
+    return;
+  }
+
+  if (area === "item-networth") {
+    const args = [action, ...rest].filter(Boolean);
+    const parsed = parseItemNetworthArgs(args);
+    if (!parsed.section) {
+      throw new Error("Usage: skyagent item-networth [nameOrUuid] [profileIdOrName] --section <section>");
+    }
+    print(await itemNetworthForPlayer(parsed.values[0], parsed.values[1], parsed.section));
     return;
   }
 
