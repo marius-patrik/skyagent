@@ -62,6 +62,8 @@ bun .\scripts\skyagent.ts section skills
 bun .\scripts\skyagent.ts progression
 bun .\scripts\skyagent.ts weight
 bun .\scripts\skyagent.ts readiness dungeons
+bun .\scripts\skyagent.ts plan f7 --budget 10000000
+bun .\scripts\skyagent.ts next-upgrades --budget 10000000
 bun .\scripts\skyagent.ts item HYPERION
 bun .\scripts\skyagent.ts price ENCHANTED_DIAMOND
 bun .\scripts\skyagent.ts lbin HYPERION
@@ -108,6 +110,8 @@ Accessory results inspect the accessory bag, estimate Magical Power, detect dupl
 Progression results provide SkyCrypt-style profile sections for skills, Dungeons, Slayer, Mining/HotM, Garden, Bestiary, Collections, Minions, Museum, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, and unlocks. Each section reports source fields, computed summaries, warnings for missing API data, and formula/table provenance. Section aliases include `hotm`, `kuudra`, `farming`, `trophy_fish`, and `important_unlocks`.
 
 Weight and readiness results are conservative. Exact Senither/Lily formulas are reported as unsupported until maintained formula tables are bundled; SkyAgent returns a clearly labeled estimate with inputs, formulas, assumptions, freshness, and warnings. Readiness supports `dungeons`, `slayer`, `kuudra`, `garden`, and `mining`.
+
+Planner results compose profile sections, networth, accessory upgrades, readiness, config, and local memories into deterministic recommendations. Each recommendation includes a reason, expected impact, cost or time estimate, prerequisites, source freshness, uncertainty, and warnings.
 
 See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, `docs/parity-spec.md` for the detailed missing-parity implementation spec, and `docs/networth-comparison.md` for networth comparison-smoke notes.
 

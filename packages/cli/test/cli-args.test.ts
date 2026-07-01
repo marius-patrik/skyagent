@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { command, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs } from "../src/index.ts";
+import { command, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs } from "../src/index.ts";
 
 let tempHome: string | null = null;
 
@@ -51,5 +51,45 @@ describe("CLI argument parsing", () => {
       budget: 1_000_000,
       values: ["Notch", "Apple"],
     });
+  });
+
+  test("next-upgrades parses player profile and budget independently", () => {
+    expect(parseNextUpgradesArgs(["Notch", "Apple", "--budget", "1000000"])).toEqual({
+      budget: 1_000_000,
+      values: ["Notch", "Apple"],
+    });
+    expect(parseNextUpgradesArgs(["--budget", "1000000"])).toEqual({
+      budget: 1_000_000,
+      values: [],
+    });
+  });
+
+  test("plan parses goal player profile and optional budget", () => {
+    expect(parsePlanArgs(["f7", "Notch", "Apple", "--budget", "1000000"])).toEqual({
+      goal: "f7",
+      budget: 1_000_000,
+      values: ["Notch", "Apple"],
+    });
+    expect(parsePlanArgs(["garden"])).toEqual({
+      goal: "garden",
+      budget: null,
+      values: [],
+    });
+  });
+
+  test("plan validates budget before fetching profile data", async () => {
+    await expect(command(["plan", "f7", "--budget", "-1"])).rejects.toThrow("Usage: skyagent plan");
+  });
+
+  test("root skyagent script delegates plan command to CLI", async () => {
+    const proc = Bun.spawn(["bun", "./scripts/skyagent.ts", "plan", "f7", "--budget", "-1"], {
+      cwd: path.resolve(import.meta.dir, "../../.."),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Usage: skyagent plan");
   });
 });

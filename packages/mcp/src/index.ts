@@ -6,6 +6,7 @@ import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resource
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
 import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
+import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 import { readinessForPlayer } from "@skyagent/core/readiness";
@@ -300,6 +301,35 @@ const tools = [
     },
   },
   {
+    name: "skyblock_plan_goal",
+    description: "Produce a deterministic, auditable plan for a SkyBlock goal with recommendations, blockers, cost/time estimates, source freshness, and warnings. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        goal: { type: "string" },
+        player: { type: "string" },
+        profile: { type: "string" },
+        budget: { type: "number" },
+      },
+      required: ["goal"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_next_upgrades",
+    description: "Rank budget-constrained next upgrade recommendations, currently centered on accessory Magical Power upgrades with explicit price freshness and warnings. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+        budget: { type: "number" },
+      },
+      required: ["budget"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "skyblock_item_metadata",
     description: "Fetch NotEnoughUpdates-style metadata for a SkyBlock internal item ID.",
     inputSchema: {
@@ -557,6 +587,16 @@ async function callTool(name: string, args: Record<string, any> = {}) {
       return weightForPlayer(args.player, args.profile);
     case "skyblock_readiness":
       return readinessForPlayer(args.area, args.player, args.profile);
+    case "skyblock_plan_goal":
+      if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
+        throw new Error("budget must be a non-negative finite number when provided.");
+      }
+      return planGoalForPlayer(args.goal, args.player, args.profile, { budget: args.budget ?? null });
+    case "skyblock_next_upgrades":
+      if (!Number.isFinite(args.budget) || args.budget < 0) {
+        throw new Error("budget must be a non-negative finite number.");
+      }
+      return nextUpgradesForPlayer(args.player, args.profile, args.budget);
     case "skyblock_item_metadata":
       return itemMetadata(args.internalId);
     case "skyblock_price":

@@ -10,6 +10,7 @@
     "./items": "./src/items.ts",
     "./nbt": "./src/nbt.ts",
     "./networth": "./src/networth.ts",
+    "./planner": "./src/planner.ts",
     "./prices": "./src/prices.ts",
     "./progression": "./src/progression.ts",
     "./profile": "./src/profile.ts",

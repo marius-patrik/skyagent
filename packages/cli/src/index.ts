@@ -6,6 +6,7 @@ import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resource
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
 import { itemMetadata, normalizedItemsForPlayer } from "@skyagent/core/items";
 import { itemNetworthForPlayer, networthForPlayer } from "@skyagent/core/networth";
+import { nextUpgradesForPlayer, planGoalForPlayer } from "@skyagent/core/planner";
 import { coflnetPriceHistory, itemPrice, lowestBin } from "@skyagent/core/prices";
 import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "@skyagent/core/profile";
 import { readinessForPlayer } from "@skyagent/core/readiness";
@@ -47,6 +48,8 @@ Usage:
   skyagent progression [nameOrUuid] [profileIdOrName]
   skyagent weight [nameOrUuid] [profileIdOrName]
   skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]
+  skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]
+  skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>
   skyagent item <internalId>
   skyagent price <itemId>
   skyagent lbin <itemId>
@@ -137,6 +140,23 @@ export function parseAccessoryUpgradeArgs(args) {
   return {
     budget: budget === null ? null : Number(budget),
     values: positionalArgs(args, ["--budget"]),
+  };
+}
+
+export function parseNextUpgradesArgs(args) {
+  const budget = optionValue(args, "--budget");
+  return {
+    budget: budget === null ? null : Number(budget),
+    values: positionalArgs(args, ["--budget"]),
+  };
+}
+
+export function parsePlanArgs(args) {
+  const budget = optionValue(args, "--budget");
+  return {
+    goal: args[0] ?? null,
+    budget: budget === null ? null : Number(budget),
+    values: positionalArgs(args.slice(1), ["--budget"]),
   };
 }
 
@@ -355,6 +375,27 @@ export async function command(args) {
       throw new Error("Usage: skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]");
     }
     print(await readinessForPlayer(action, rest[0], rest[1]));
+    return;
+  }
+
+  if (area === "plan") {
+    const parsed = parsePlanArgs([action, ...rest].filter(Boolean));
+    if (!parsed.goal) {
+      throw new Error("Usage: skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
+    }
+    if (parsed.budget !== null && (!Number.isFinite(parsed.budget) || parsed.budget < 0)) {
+      throw new Error("Usage: skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
+    }
+    print(await planGoalForPlayer(parsed.goal, parsed.values[0], parsed.values[1], { budget: parsed.budget }));
+    return;
+  }
+
+  if (area === "next-upgrades") {
+    const parsed = parseNextUpgradesArgs([action, ...rest].filter(Boolean));
+    if (parsed.budget === null || !Number.isFinite(parsed.budget) || parsed.budget < 0) {
+      throw new Error("Usage: skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins>");
+    }
+    print(await nextUpgradesForPlayer(parsed.values[0], parsed.values[1], parsed.budget));
     return;
   }
 
