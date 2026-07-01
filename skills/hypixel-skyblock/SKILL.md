@@ -23,7 +23,22 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 4. Compare the user's current bottlenecks against the target.
 5. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
 
+## SkyAgent Tooling
+
+- Use `skyagent_config_get` first to see whether username, UUID, selected profile, and API key are configured.
+- Use `minecraft_resolve_username` when the user gives a Minecraft name and a UUID is needed.
+- Use `skyblock_profiles` to inspect the user's available SkyBlock profiles before choosing a profile-specific endpoint.
+- Use `skyblock_profile`, `skyblock_museum`, and `skyblock_garden` for profile-state analysis.
+- Use `skyblock_resource`, `skyblock_bazaar`, `skyblock_auctions`, `skyblock_auction`, `skyblock_firesales`, and `skyblock_news` for live game reference and economy context.
+- Use `hypixel_request` for official Hypixel v2 endpoints not covered by a dedicated tool.
+- Use SkyAgent memories for stable user preferences, selected goals, profile notes, and prior analysis summaries. Do not store secrets in memories.
+
+## Secrets and Storage
+
+Prefer `HYPIXEL_API_KEY` from the environment. The CLI and MCP server can also store an API key in the SkyAgent user config directory when the user explicitly asks. Do not print API key values back to the user.
+
+Config and memories live outside the plugin repo by default, under `%APPDATA%\skyagent` on Windows or `~/.skyagent` elsewhere. `SKYAGENT_HOME` can override this for testing.
+
 ## Recommendation Style
 
 Plans should be concrete and sequenced. Include the next session's actions first, then medium-term routing. Call out assumptions clearly when API or wiki access is unavailable.
-

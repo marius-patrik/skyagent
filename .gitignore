@@ -7,4 +7,5 @@ coverage/
 *.log
 profile-cache/
 data/cache/
-
+*.tmp
+.tmp-*/

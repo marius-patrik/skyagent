@@ -1,60 +1,344 @@
 #!/usr/bin/env node
 
-import readline from "node:readline";
+import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "./lib/store.mjs";
+import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "./lib/hypixel.mjs";
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: false,
-});
+const tools = [
+  {
+    name: "skyagent_config_get",
+    description: "Read SkyAgent config metadata without revealing the Hypixel API key.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "skyagent_config_set",
+    description: "Store SkyAgent username, UUID, selected SkyBlock profile ID, or Hypixel API key in the user config store.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        key: { type: "string", enum: ["username", "uuid", "profile", "api-key"] },
+        value: { type: "string" },
+      },
+      required: ["key", "value"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_memory_add",
+    description: "Store a durable SkyAgent note, preference, goal, or profile-analysis memory.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        tags: { type: "array", items: { type: "string" } },
+      },
+      required: ["text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_memory_list",
+    description: "List stored SkyAgent memories.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "skyagent_memory_delete",
+    description: "Delete a SkyAgent memory by ID.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "minecraft_resolve_username",
+    description: "Resolve a Minecraft username to UUID using the Mojang profile API.",
+    inputSchema: {
+      type: "object",
+      properties: { username: { type: "string" } },
+      required: ["username"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "hypixel_player",
+    description: "Fetch Hypixel player data for a username or UUID. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { player: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "hypixel_status",
+    description: "Fetch Hypixel online status for a username or UUID. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { player: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_profiles",
+    description: "Fetch all SkyBlock profiles for a username or UUID. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { player: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_profile",
+    description: "Fetch one SkyBlock profile by profile ID, or the configured selected profile. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { profile: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_museum",
+    description: "Fetch SkyBlock museum data by profile ID, or the configured selected profile. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { profile: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_garden",
+    description: "Fetch SkyBlock garden data by profile ID, or the configured selected profile. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { profile: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_bingo_player",
+    description: "Fetch SkyBlock bingo data for a username or UUID. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { player: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_resource",
+    description: "Fetch a public SkyBlock resource: collections, skills, items, election, or bingo.",
+    inputSchema: {
+      type: "object",
+      properties: { resource: { type: "string", enum: ["collections", "skills", "items", "election", "bingo"] } },
+      required: ["resource"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_bazaar",
+    description: "Fetch public SkyBlock Bazaar data.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "skyblock_auctions",
+    description: "Fetch active SkyBlock auctions by page.",
+    inputSchema: {
+      type: "object",
+      properties: { page: { type: "number" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_auction",
+    description: "Fetch SkyBlock auction data by auction UUID, player UUID, or profile ID. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        lookupType: { type: "string", enum: ["uuid", "player", "profile"] },
+        id: { type: "string" },
+      },
+      required: ["lookupType", "id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_auctions_ended",
+    description: "Fetch recently ended SkyBlock auctions.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "skyblock_firesales",
+    description: "Fetch active and upcoming SkyBlock fire sales.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "skyblock_news",
+    description: "Fetch SkyBlock news. Requires API key.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "hypixel_request",
+    description: "Call an arbitrary Hypixel v2 endpoint path with query parameters. Use for endpoints not covered by dedicated tools.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        query: { type: "object", additionalProperties: { type: ["string", "number", "boolean"] } },
+        requireKey: { type: "boolean" },
+      },
+      required: ["path"],
+      additionalProperties: false,
+    },
+  },
+];
+
+const configKeyMap = {
+  username: "username",
+  uuid: "uuid",
+  profile: "selectedProfileId",
+  "api-key": "apiKey",
+};
+
+function textResult(value) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(value, null, 2),
+      },
+    ],
+  };
+}
+
+async function callTool(name, args = {}) {
+  switch (name) {
+    case "skyagent_config_get":
+      return publicConfig();
+    case "skyagent_config_set":
+      return setConfigValue(configKeyMap[args.key], args.value);
+    case "skyagent_memory_add":
+      return addMemory({ text: args.text, tags: args.tags ?? [], source: "mcp" });
+    case "skyagent_memory_list":
+      return readMemories();
+    case "skyagent_memory_delete":
+      return deleteMemory(args.id);
+    case "minecraft_resolve_username":
+      return resolveMinecraftUsername(args.username);
+    case "hypixel_player":
+      return hypixelRequest("player", { uuid: await uuidFromNameOrUuid(args.player) }, { requireKey: true });
+    case "hypixel_status":
+      return hypixelRequest("status", { uuid: await uuidFromNameOrUuid(args.player) }, { requireKey: true });
+    case "skyblock_profiles":
+      return skyblockProfiles(args.player);
+    case "skyblock_profile":
+      return hypixelRequest("skyblock/profile", { profile: await configuredProfileId(args.profile) }, { requireKey: true });
+    case "skyblock_museum":
+      return hypixelRequest("skyblock/museum", { profile: await configuredProfileId(args.profile) }, { requireKey: true });
+    case "skyblock_garden":
+      return hypixelRequest("skyblock/garden", { profile: await configuredProfileId(args.profile) }, { requireKey: true });
+    case "skyblock_bingo_player":
+      return hypixelRequest("skyblock/bingo", { uuid: await uuidFromNameOrUuid(args.player) }, { requireKey: true });
+    case "skyblock_resource":
+      return hypixelRequest(resourceEndpoint(args.resource));
+    case "skyblock_bazaar":
+      return hypixelRequest("skyblock/bazaar");
+    case "skyblock_auctions":
+      return hypixelRequest("skyblock/auctions", { page: args.page ?? 0 });
+    case "skyblock_auction":
+      return hypixelRequest("skyblock/auction", { [args.lookupType]: args.id }, { requireKey: true });
+    case "skyblock_auctions_ended":
+      return hypixelRequest("skyblock/auctions_ended");
+    case "skyblock_firesales":
+      return hypixelRequest("skyblock/firesales");
+    case "skyblock_news":
+      return hypixelRequest("skyblock/news", {}, { requireKey: true });
+    case "hypixel_request":
+      return hypixelRequest(args.path, args.query ?? {}, { requireKey: Boolean(args.requireKey) });
+    default:
+      throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+function response(id, result) {
+  return { jsonrpc: "2.0", id, result };
+}
+
+function errorResponse(id, code, message) {
+  return { jsonrpc: "2.0", id, error: { code, message } };
+}
 
 function send(message) {
-  process.stdout.write(`${JSON.stringify(message)}\n`);
+  const payload = JSON.stringify(message);
+  process.stdout.write(`Content-Length: ${Buffer.byteLength(payload, "utf8")}\r\n\r\n${payload}`);
 }
 
-function respond(id, result) {
-  send({ jsonrpc: "2.0", id, result });
-}
-
-function error(id, code, message) {
-  send({ jsonrpc: "2.0", id, error: { code, message } });
-}
-
-rl.on("line", (line) => {
-  if (!line.trim()) {
+async function handle(message) {
+  if (message.id === undefined) {
     return;
   }
 
-  let request;
   try {
-    request = JSON.parse(line);
-  } catch {
-    error(null, -32700, "Parse error");
-    return;
+    switch (message.method) {
+      case "initialize":
+        send(response(message.id, {
+          protocolVersion: message.params?.protocolVersion ?? "2024-11-05",
+          capabilities: { tools: {} },
+          serverInfo: { name: "skyagent", version: "0.1.0" },
+        }));
+        break;
+      case "tools/list":
+        send(response(message.id, { tools }));
+        break;
+      case "tools/call": {
+        const result = await callTool(message.params?.name, message.params?.arguments ?? {});
+        send(response(message.id, textResult(result)));
+        break;
+      }
+      default:
+        send(errorResponse(message.id, -32601, `Method not found: ${message.method}`));
+        break;
+    }
+  } catch (error) {
+    send(errorResponse(message.id, -32000, error.message));
   }
+}
 
-  if (request.id === undefined) {
-    return;
-  }
+let buffer = Buffer.alloc(0);
 
-  switch (request.method) {
-    case "initialize":
-      respond(request.id, {
-        protocolVersion: request.params?.protocolVersion ?? "2024-11-05",
-        capabilities: {
-          tools: {},
-        },
-        serverInfo: {
-          name: "skyagent",
-          version: "0.1.0",
-        },
-      });
-      break;
-    case "tools/list":
-      respond(request.id, { tools: [] });
-      break;
-    default:
-      error(request.id, -32601, `Method not found: ${request.method}`);
-      break;
+function parseMessages() {
+  while (buffer.length > 0) {
+    const headerEnd = buffer.indexOf("\r\n\r\n");
+    if (headerEnd !== -1) {
+      const header = buffer.slice(0, headerEnd).toString("utf8");
+      const match = header.match(/Content-Length:\s*(\d+)/i);
+      if (!match) {
+        buffer = buffer.slice(headerEnd + 4);
+        continue;
+      }
+      const length = Number(match[1]);
+      const bodyStart = headerEnd + 4;
+      const bodyEnd = bodyStart + length;
+      if (buffer.length < bodyEnd) {
+        return;
+      }
+      const body = buffer.slice(bodyStart, bodyEnd).toString("utf8");
+      buffer = buffer.slice(bodyEnd);
+      handle(JSON.parse(body));
+      continue;
+    }
+
+    const newline = buffer.indexOf("\n");
+    if (newline === -1) {
+      return;
+    }
+    const line = buffer.slice(0, newline).toString("utf8").trim();
+    buffer = buffer.slice(newline + 1);
+    if (line) {
+      handle(JSON.parse(line));
+    }
   }
+}
+
+process.stdin.on("data", (chunk) => {
+  buffer = Buffer.concat([buffer, chunk]);
+  parseMessages();
 });
