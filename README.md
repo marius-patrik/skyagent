@@ -68,7 +68,7 @@ Source priority should generally be: live API data, official patch notes, offici
 
 Hypixel v2 uses the `API-Key` request header for authenticated endpoints. Rate-limit details are returned in `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. SkyBlock item and inventory payloads can contain base64 encoded gzipped NBT data; decoding that is intentionally left for a later parser module.
 
-See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools.
+See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools, and `docs/parity-spec.md` for the detailed missing-parity implementation spec.
 
 ## CI
 

@@ -2,6 +2,8 @@
 
 SkyAgent currently covers official Hypixel API transport and light profile-viewer abstractions. It is not yet at SkyCrypt or Discord bot feature parity.
 
+For the detailed implementation spec and future issue slices, see `docs/parity-spec.md`.
+
 ## Covered
 
 - Mojang username to UUID resolution.
@@ -37,4 +39,3 @@ SkyAgent currently covers official Hypixel API transport and light profile-viewe
 3. Add price providers for Bazaar, lowest BIN, and optional third-party historical prices.
 4. Add networth and missing-accessory calculators.
 5. Add profile modules for skills, Dungeons, Slayer, Mining, Farming, Bestiary, Collections, and Minions.
-
