@@ -32,8 +32,8 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `$skyagent-accessories` for Magical Power, accessory bag state, missing accessories, duplicates, enrichment, recombobulation, budget-constrained coin-per-MP upgrades, or accessory price uncertainty.
 - Use `$skyagent-progression` for profile sections, XP curves, skills, Catacombs, Slayer, Bestiary, Collections, Minions, Museum, Mining/HotM, Garden, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, or unlocks.
 - Use `$skyagent-readiness-weight` for Senither/Lily-style weight status, unsupported exact formulas, formula freshness, and readiness for dungeons, slayer, kuudra, garden, or mining.
-- Use `$skyagent-planning` for goal plans, next upgrades, blockers, daily/weekly routes, and what to skip.
-- Use `$skyagent-provider-maintenance` for patch-sensitive metas, provider freshness, stale formulas, parity assumptions, or official-source verification.
+- Use `$skyagent-planning` for goal plans, next upgrades, upgrade priority, budget-constrained recommendations, blockers, daily/weekly routes, prerequisites, and what to skip.
+- Use `$skyagent-provider-maintenance` for patch-sensitive metas, patch notes, wiki pages, NEU/SkyHelper/CoflNet assumptions, provider freshness, stale formulas, parity drift, or official-source verification.
 
 ## SkyAgent Tooling
 

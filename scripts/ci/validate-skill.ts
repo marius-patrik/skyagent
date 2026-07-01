@@ -202,4 +202,46 @@ for (const expected of [
   }
 }
 
+const planningSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-planning", "SKILL.md"), "utf8");
+for (const expected of [
+  "skyblock_plan_goal",
+  "skyblock_next_upgrades",
+  "daily/weekly routes",
+  "budget-constrained recommendations",
+  "skyblock_profile_overview",
+  "skyblock_progression",
+  "skyblock_readiness",
+  "skyblock_networth",
+  "skyblock_accessories",
+  "skyblock_price",
+  "$skyagent-provider-maintenance",
+  "expected impact",
+  "cost/time estimate",
+  "source freshness",
+  "what to skip",
+]) {
+  if (!planningSkill.includes(expected)) {
+    fail(`skyagent-planning must mention ${expected}`);
+  }
+}
+
+const providerSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-provider-maintenance", "SKILL.md"), "utf8");
+for (const expected of [
+  "patch notes",
+  "wiki pages",
+  "NEU",
+  "SkyHelper",
+  "CoflNet",
+  "parity drift",
+  "skyblock_resource",
+  "skyblock_news",
+  "Verify live web/wiki/provider data",
+  "stale-cache warnings",
+  "docs/parity.md",
+]) {
+  if (!providerSkill.includes(expected)) {
+    fail(`skyagent-provider-maintenance must mention ${expected}`);
+  }
+}
+
 console.log(`Skill validation passed (${folders.length} skills)`);
