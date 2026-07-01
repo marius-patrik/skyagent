@@ -229,7 +229,7 @@ Release workflow responsibilities:
 3. #57: Add CLI gateway process manager: start/stop/status/logs.
 4. #58: Adapt Ink TUI to connect through the gateway.
 5. #59: Add web lifecycle commands: start/stop/status/open.
-6. #66: Polish the web app UX, SkyBlock theming, and licensed resource-pack item rendering.
+6. [#66](https://github.com/marius-patrik/skyagent/issues/66): Polish the web app UX, SkyBlock theming, and licensed resource-pack item rendering.
 7. #60: Add interactive `skyagent setup`.
 8. #61: Add standalone build and cross-platform install scripts.
 9. #62: Add GitHub Release automation and pride-version labels.

@@ -32,3 +32,9 @@ jobs:
       - name: Run CI checks
         run: bun run ci
 
+      - name: Install Playwright Chromium
+        run: bunx playwright install chromium
+
+      - name: Run web visual QA
+        run: bun run visual:web
+

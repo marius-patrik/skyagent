@@ -6,6 +6,7 @@ dist/
 !packages/web/dist/
 !packages/web/dist/**
 coverage/
+artifacts/
 *.log
 profile-cache/
 data/cache/

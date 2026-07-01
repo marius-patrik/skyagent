@@ -19,6 +19,7 @@
     "build:web": "bun run --cwd packages/web build",
     "build:release": "bun ./scripts/build-release.ts",
     "dev:web": "bun run --cwd packages/web dev",
+    "visual:web": "bun run --cwd packages/web visual:qa",
     "release:metadata": "bun ./scripts/write-release-metadata.ts",
     "release:plan": "bun ./scripts/plan-release.ts",
     "tui": "bun ./packages/tui/src/bin.ts",

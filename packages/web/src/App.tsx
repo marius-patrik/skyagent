@@ -1,400 +1,635 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BarChart3, Boxes, CalendarClock, CheckCircle2, ChevronDown, CircleDollarSign, ClipboardList, Gem, KeyRound, Layers3, Loader2, Pickaxe, RefreshCw, Search, Settings, ShieldAlert, Sparkles, UserRound } from "lucide-react";
-import { RARITY_ORDER, SKILL_NAMES } from "@skyagent/core/progression";
-import { cn } from "./lib/utils.ts";
+import * as Tabs from "@radix-ui/react-tabs";
+import * as Switch from "@radix-ui/react-switch";
+import dagre from "dagre";
+import { motion } from "motion/react";
+import {
+  AlertTriangle,
+  Box,
+  Boxes,
+  CircleDollarSign,
+  Gem,
+  GitBranch,
+  Hammer,
+  Layers3,
+  PackageCheck,
+  Pickaxe,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Swords,
+  Settings,
+} from "lucide-react";
+import { accessories, equipment, inventorySections, networthBreakdown, plannerSteps, profile as mockProfile, progression, providerStatus } from "./mock-data.ts";
+import { createManifestSource, defaultPackSources, resolveFailedExternalTexture, resolveTexture, resourcePackCache, resourcePacks, type PackManifest, type PackSource, type ResourcePack, type TextureResolution } from "./resource-packs.ts";
 import { Button } from "./components/ui/button.tsx";
-import { Card } from "./components/ui/card.tsx";
-import { Input } from "./components/ui/input.tsx";
+import { cn } from "./lib/utils.ts";
 
-type ViewId = "overview" | "inventory" | "networth" | "accessories" | "progression" | "planner" | "settings";
-type LoadState = "ready" | "loading" | "error" | "disabled" | "missing" | "outage";
+type ViewId = "overview" | "inventory" | "networth" | "accessories" | "progression" | "planner" | "packs" | "settings";
 
-const views: Array<{ id: ViewId; label: string; icon: typeof BarChart3 }> = [
-  { id: "overview", label: "Overview", icon: BarChart3 },
+const views: Array<{ id: ViewId; label: string; icon: typeof Boxes }> = [
+  { id: "overview", label: "Overview", icon: Sparkles },
   { id: "inventory", label: "Inventory", icon: Boxes },
   { id: "networth", label: "Networth", icon: CircleDollarSign },
   { id: "accessories", label: "Accessories", icon: Gem },
   { id: "progression", label: "Progression", icon: Layers3 },
-  { id: "planner", label: "Planner", icon: ClipboardList },
+  { id: "planner", label: "Planner", icon: GitBranch },
+  { id: "packs", label: "Resource Packs", icon: PackageCheck },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-const statusCopy: Record<LoadState, { label: string; detail: string; icon: typeof CheckCircle2 }> = {
-  ready: { label: "Ready", detail: "Local shell is ready to connect to SkyAgent services.", icon: CheckCircle2 },
-  loading: { label: "Loading", detail: "Fetching the latest profile data.", icon: Loader2 },
-  error: { label: "Error", detail: "The last request failed. Check configuration and provider status.", icon: ShieldAlert },
-  disabled: { label: "API disabled", detail: "Add an API key or use environment configuration before fetching private profile data.", icon: KeyRound },
-  missing: { label: "Missing profile", detail: "Select a profile or confirm the configured username.", icon: UserRound },
-  outage: { label: "Provider outage", detail: "A price or metadata provider is unavailable; stale or partial results may be shown.", icon: AlertTriangle },
+type GatewaySettings = {
+  baseUrl: string;
+  token: string;
+  player: string;
+  profile: string;
 };
-const stateOrder: LoadState[] = ["ready", "loading", "error", "disabled", "missing", "outage"];
 
-const sectionRows = [
-  ["Inventory", "Armor, equipment, wardrobe, backpacks, vault, pets", "Decoded sections"],
-  ["Networth", "Purse, bank, priced items, unknown prices", "Estimate"],
-  ["Accessories", "Magical Power, duplicates, missing upgrades", "Budget aware"],
-  ["Progression", "Skills, Dungeons, Slayer, Mining, Garden, Rift", "Sections"],
-  ["Planner", "Goal route, blockers, next upgrades, what to skip", "Auditable"],
-];
+type PackState = {
+  packs: ResourcePack[];
+  sources: PackSource[];
+};
 
-const readinessRows = [
-  ["Dungeons", "Catacombs 24, class 20, floor progress"],
-  ["Slayer", "Broad Slayer XP and boss unlock signals"],
-  ["Kuudra", "Combat, Crimson Isle, Kuudra completions"],
-  ["Garden", "Garden level, Farming level, crop milestones"],
-  ["Mining", "HotM, powder foundation, major unlocks"],
-];
+function exampleManifest(url: string): PackManifest {
+  const baseUrl = url.replace(/[\\/]$/, "");
+  return {
+    name: "User provided SkyBlock pack manifest",
+    license: "User-confirmed license for local private use",
+    homepage: baseUrl,
+    fetchedAt: new Date().toISOString(),
+    stale: false,
+    providerMethod: "user-manifest",
+    textures: {
+      HYPERION: `${baseUrl}/items/HYPERION.png`,
+      TERMINATOR: `${baseUrl}/items/TERMINATOR.png`,
+      WITHER_GOGGLES: `${baseUrl}/items/WITHER_GOGGLES.png`,
+      STORM_CHESTPLATE: `${baseUrl}/items/STORM_CHESTPLATE.png`,
+      IMPLOSION_BELT: `${baseUrl}/items/IMPLOSION_BELT.png`,
+      WITHER_RELIC: `${baseUrl}/items/WITHER_RELIC.png`,
+    },
+  };
+}
 
 function storageValue(key: string, fallback: string) {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-  return window.localStorage.getItem(key) ?? fallback;
+  return typeof window === "undefined" ? fallback : window.localStorage.getItem(key) ?? fallback;
 }
 
-function saveStorage(key: string, value: string) {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(key, value);
-  }
+async function gatewayRequest(settings: GatewaySettings, route: string) {
+  const response = await fetch(`${settings.baseUrl.replace(/\/$/, "")}${route}`, {
+    headers: settings.token ? { authorization: `Bearer ${settings.token}` } : {},
+  });
+  if (!response.ok) throw new Error(`${route} failed: HTTP ${response.status}`);
+  return response.json();
 }
 
-function Field({ label, value, onChange, type = "text", placeholder = "" }: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-}) {
+function coins(value: string) {
+  return value.replace("B", "b").replace("M", "m");
+}
+
+function ItemIcon({ itemId, rarity, packState }: { itemId: string; rarity: string; packState: PackState }) {
+  const [runtimeFallback, setRuntimeFallback] = useState<TextureResolution | null>(null);
+  useEffect(() => setRuntimeFallback(null), [itemId, packState]);
+  const texture = runtimeFallback ?? resolveTexture(itemId, packState.packs, packState.sources);
   return (
-    <label className="field">
-      <span>{label}</span>
-      <Input value={value} onChange={(event) => onChange(event.currentTarget.value)} type={type} placeholder={placeholder} />
-    </label>
+    <span
+      className={cn("item-icon", `rarity-${rarity}`, `texture-${texture.texture}`)}
+      title={`${itemId} via ${texture.attribution}`}
+    >
+      <span className="texture-shape">
+        {texture.textureUrl ? (
+          <img
+            alt=""
+            src={texture.textureUrl}
+            onError={(event) => {
+              event.currentTarget.hidden = true;
+              setRuntimeFallback(resolveFailedExternalTexture(itemId, texture));
+            }}
+          />
+        ) : null}
+      </span>
+    </span>
   );
 }
 
-function StateBanner({ state }: { state: LoadState }) {
-  const copy = statusCopy[state];
-  const Icon = copy.icon;
+function Metric({ label, value, detail, tone = "plain" }: { label: string; value: string; detail: string; tone?: string }) {
   return (
-    <section className={cn("state-banner", state)}>
-      <Icon className={cn("state-icon", state === "loading" && "spin")} size={18} />
-      <div>
-        <strong>{copy.label}</strong>
-        <span>{copy.detail}</span>
-      </div>
+    <motion.article className={cn("metric", tone)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </motion.article>
+  );
+}
+
+function ProviderStrip() {
+  return (
+    <section className="provider-strip" aria-label="Provider status">
+      {providerStatus.map((provider) => (
+        <article className={cn("provider-pill", provider.severity)} key={provider.source}>
+          {provider.severity === "ok" ? <ShieldCheck size={16} /> : <AlertTriangle size={16} />}
+          <div>
+            <strong>{provider.source}</strong>
+            <span>{provider.status} · {provider.freshness}</span>
+          </div>
+        </article>
+      ))}
     </section>
   );
 }
 
-function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+function Overview({ live, onRefresh, packState }: { live: any; onRefresh: () => void; packState: PackState }) {
+  const profile = live.profile;
   return (
-    <div className="metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </div>
-  );
-}
-
-function Overview({ username, profile, setProfile }: { username: string; profile: string; setProfile: (value: string) => void }) {
-  return (
-    <div className="view-grid">
-      <Card className="panel wide">
-        <div className="panel-heading">
-          <div>
-            <h2>Profile Overview</h2>
-            <p>{username || "No username"} / {profile || "No profile selected"}</p>
+    <div className="view-grid overview-grid">
+      <section className="profile-band">
+        <div className="profile-head">
+          <div className="skin-frame" aria-hidden="true">
+            <span className="skin-head" />
+            <span className="skin-body" />
           </div>
-          <Button className="icon-button" aria-label="Refresh profile"><RefreshCw size={18} /></Button>
+          <div>
+            <span className="eyebrow">Selected SkyBlock Profile</span>
+            <h1>{profile.username}</h1>
+            <p>{profile.profile} · Level {profile.level} · {profile.selectedGoal}</p>
+          </div>
         </div>
-        <div className="metrics-grid">
-          <Metric label="Networth" value="Pending" detail="Connect API to calculate" />
-          <Metric label="Magical Power" value="Pending" detail="Accessory bag required" />
-          <Metric label="Readiness" value="5 areas" detail="Dungeons to Mining" />
-          <Metric label="Planner" value="Ready" detail="Goal route shell" />
+        <Button className="action-button" onClick={onRefresh}><RefreshCw size={16} /> Refresh</Button>
+      </section>
+
+      <Metric label="Networth" value={profile.networth} detail={`${profile.purse} purse · ${profile.bank} bank`} tone="gold" />
+      <Metric label="Magical Power" value={String(profile.magicalPower)} detail="Accessory enrichment ready" tone="purple" />
+      <Metric label="Goal" value="M5" detail="Planner has 5 auditable steps" tone="blue" />
+
+      <section className="panel wide">
+        <div className="section-heading">
+          <div>
+            <h2>Current Gear</h2>
+            <p>Resolved through the resource-pack adapter with generated fallback textures.</p>
+          </div>
+          <Swords size={20} />
         </div>
-      </Card>
-      <Card className="panel">
-        <h3>Profile Selector</h3>
-        <div className="selector-list">
-          {["Apple", "Banana", "Coconut"].map((name) => (
-            <Button className={cn("selector-row", profile === name && "selected")} key={name} onClick={() => setProfile(name)}>
-              <span>{name}</span>
-              <small>{profile === name ? "Selected" : "Available"}</small>
-            </Button>
+        <div className="equipment-grid">
+          {equipment.map((item) => (
+            <article className="equipment-tile" key={item.slot}>
+              <ItemIcon itemId={item.itemId} rarity={item.rarity} packState={packState} />
+              <div>
+                <span>{item.slot}</span>
+                <strong>{item.name}</strong>
+                <small>{item.detail}</small>
+              </div>
+              <b>{coins(item.value)}</b>
+            </article>
           ))}
         </div>
-      </Card>
-      <Card className="panel">
-        <h3>Provider Signals</h3>
-        <ul className="status-list">
-          <li><CheckCircle2 size={16} /> Hypixel API configured by env or local settings</li>
-          <li><AlertTriangle size={16} /> Price providers can return partial candidates</li>
-          <li><ShieldAlert size={16} /> Secrets never render in full</li>
-        </ul>
-      </Card>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading compact">
+          <h2>Freshness</h2>
+          <AlertTriangle size={18} />
+        </div>
+        <ProviderStrip />
+      </section>
     </div>
   );
 }
 
 function Inventory() {
   return (
-    <Card className="panel wide">
-      <div className="panel-heading">
-        <h2>Inventory And Item Sections</h2>
-        <Button className="text-button"><Search size={16} /> Inspect</Button>
-      </div>
-      <div className="table">
-        {["Armor", "Equipment", "Wardrobe", "Inventory", "Ender Chest", "Backpacks", "Accessory Bag", "Personal Vault", "Pets"].map((section) => (
-          <div className="table-row" key={section}>
-            <span>{section}</span>
-            <small>Uses shared inventory extraction and item normalization</small>
-            <strong>Waiting</strong>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function Networth() {
-  return (
-    <Card className="panel wide">
-      <div className="panel-heading">
-        <h2>Networth Breakdown</h2>
-        <Button className="text-button"><CircleDollarSign size={16} /> Reprice</Button>
-      </div>
-      <div className="split">
-        <div className="stack">
-          {["Purse", "Bank", "Armor", "Equipment", "Accessories", "Pets"].map((name, index) => (
-            <div className="bar-row" key={name}>
-              <span>{name}</span>
-              <div><i style={{ width: `${28 + index * 9}%` }} /></div>
-              <strong>--</strong>
-            </div>
-          ))}
+    <section className="panel wide">
+      <div className="section-heading">
+        <div>
+          <h2>Inventory Sections</h2>
+          <p>Gateway-ready section cards keep decoded counts, warnings, and priced value separate.</p>
         </div>
-        <div className="callout">
-          <AlertTriangle size={18} />
-          <p>Unknown prices and partial auction candidates stay visible instead of being folded into totals.</p>
-        </div>
+        <Boxes size={20} />
       </div>
-    </Card>
-  );
-}
-
-function Accessories() {
-  return (
-    <Card className="panel wide">
-      <div className="panel-heading">
-        <h2>Missing Accessories</h2>
-        <Button className="text-button"><Gem size={16} /> Rank MP</Button>
-      </div>
-      <div className="upgrade-list">
-        {RARITY_ORDER.slice(0, 6).map((rarity, index) => (
-          <article className="upgrade" key={rarity}>
-            <span>{rarity}</span>
-            <strong>{index + 3} MP candidate</strong>
-            <small>Requires price and accessory metadata provider</small>
+      <div className="inventory-board">
+        {inventorySections.map((section) => (
+          <article className="inventory-section" key={section.name}>
+            <Box size={18} />
+            <strong>{section.name}</strong>
+            <span>{section.decoded} decoded</span>
+            <small className={section.warnings ? "warn-text" : ""}>{section.warnings} warnings</small>
+            <b>{section.value}</b>
           </article>
         ))}
       </div>
-    </Card>
+    </section>
+  );
+}
+
+function Networth({ live }: { live: any }) {
+  const profile = live.profile;
+  const total = live.networth?.networth?.total ?? live.networth?.total ?? profile.networth;
+  return (
+    <section className="panel wide">
+      <div className="section-heading">
+        <div>
+          <h2>Networth Breakdown</h2>
+          <p>Totals separate known value, low-confidence sections, and provider provenance instead of hiding estimates.</p>
+        </div>
+        <CircleDollarSign size={20} />
+      </div>
+      <div className="networth-layout">
+        <div className="networth-total">
+          <span>Total estimate</span>
+          <strong>{typeof total === "number" ? total.toLocaleString() : total}</strong>
+          <small>{profile.purse} purse · {profile.bank} bank · unknown prices excluded</small>
+        </div>
+        <div className="networth-list">
+          {networthBreakdown.map((row) => (
+            <article className="networth-row" key={row.name}>
+              <div>
+                <strong>{row.name}</strong>
+                <span>{row.provider} · {row.confidence} confidence</span>
+              </div>
+              <div className="progress-track"><i style={{ width: `${row.share}%` }} /></div>
+              <b>{row.value}</b>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Accessories({ packState }: { packState: PackState }) {
+  return (
+    <section className="panel wide">
+      <div className="section-heading">
+        <div>
+          <h2>Accessory Upgrades</h2>
+          <p>Ranked by coin per Magical Power with explicit metadata fallback behavior.</p>
+        </div>
+        <Gem size={20} />
+      </div>
+      <div className="upgrade-list">
+        {accessories.map((item) => (
+          <article className="upgrade-row" key={item.name}>
+            <ItemIcon itemId={item.itemId} rarity={item.rarity} packState={packState} />
+            <div>
+              <strong>{item.name}</strong>
+              <span>{item.mp} MP · {item.efficiency}</span>
+            </div>
+            <b>{item.cost}</b>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
 function Progression() {
   return (
-    <Card className="panel wide">
-      <div className="panel-heading">
-        <h2>Progression Sections</h2>
-        <Button className="text-button"><Layers3 size={16} /> Load Sections</Button>
+    <section className="panel wide">
+      <div className="section-heading">
+        <div>
+          <h2>Progression Readiness</h2>
+          <p>Compact sections for repeated comparison across combat, economy, and skill goals.</p>
+        </div>
+        <Pickaxe size={20} />
       </div>
-      <div className="section-grid">
-        {sectionRows.map(([name, detail, state]) => (
-          <article className="section-tile" key={name}>
-            <strong>{name}</strong>
-            <span>{detail}</span>
-            <small>{state}</small>
+      <div className="progression-grid">
+        {progression.map((area) => (
+          <article className="progress-card" key={area.area}>
+            <div>
+              <strong>{area.area}</strong>
+              <span>Level {area.level}</span>
+            </div>
+            <div className="progress-track"><i style={{ width: `${area.score}%` }} /></div>
+            <small>{area.next}</small>
           </article>
         ))}
       </div>
-      <div className="skill-strip">
-        {SKILL_NAMES.slice(0, 8).map((skill) => <span key={skill}>{skill}</span>)}
-      </div>
-    </Card>
+    </section>
   );
+}
+
+function plannerLayout() {
+  const graph = new dagre.graphlib.Graph();
+  graph.setGraph({ rankdir: "LR", nodesep: 34, ranksep: 54 });
+  graph.setDefaultEdgeLabel(() => ({}));
+  for (const step of plannerSteps) graph.setNode(step.id, { width: 156, height: 64 });
+  for (let index = 0; index < plannerSteps.length - 1; index += 1) graph.setEdge(plannerSteps[index].id, plannerSteps[index + 1].id);
+  dagre.layout(graph);
+  return plannerSteps.map((step) => ({ ...step, ...(graph.node(step.id) as { x: number; y: number }) }));
 }
 
 function Planner() {
+  const nodes = useMemo(plannerLayout, []);
   return (
-    <Card className="panel wide">
-      <div className="panel-heading">
+    <section className="panel wide">
+      <div className="section-heading">
         <div>
-          <h2>Goal Planner</h2>
-          <p>Routes combine readiness, networth, accessories, profile sections, memories, and warnings.</p>
+          <h2>Goal Plan Graph</h2>
+          <p>Dagre lays out the route so blockers, upgrades, and provider warnings stay auditable.</p>
         </div>
-        <Button className="text-button"><Sparkles size={16} /> Plan</Button>
+        <Hammer size={20} />
       </div>
-      <div className="planner-layout">
-        <label className="field">
-          <span>Goal</span>
-          <Input defaultValue="F7 completion" />
-        </label>
-        <label className="field">
-          <span>Budget</span>
-          <Input defaultValue="10000000" inputMode="numeric" />
-        </label>
-        <div className="route-list">
-          {readinessRows.map(([area, detail]) => (
-            <article className="route-step" key={area}>
-              <Pickaxe size={16} />
-              <div>
-                <strong>{area}</strong>
-                <small>{detail}</small>
-              </div>
-              <span>Estimate</span>
-            </article>
-          ))}
-        </div>
+      <div className="plan-canvas">
+        {nodes.map((node, index) => (
+          <motion.article
+            className="plan-node"
+            key={node.id}
+            style={{ left: node.x - 78, top: node.y - 32 }}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.04 }}
+          >
+            <span>{index + 1}</span>
+            <strong>{node.label}</strong>
+            <small>{node.detail}</small>
+          </motion.article>
+        ))}
       </div>
-    </Card>
+    </section>
   );
 }
 
-function SettingsView({ username, setUsername, profile, setProfile, apiKey, setApiKey }: {
-  username: string;
-  setUsername: (value: string) => void;
-  profile: string;
-  setProfile: (value: string) => void;
-  apiKey: string;
-  setApiKey: (value: string) => void;
-}) {
-  const [priceProvider, setPriceProvider] = useState(() => storageValue("skyagent.priceProvider", "CoflNet + Hypixel fallback"));
-  const [metadataProvider, setMetadataProvider] = useState(() => storageValue("skyagent.metadataProvider", "NotEnoughUpdates + Hypixel resources"));
-  const [cacheMode, setCacheMode] = useState(() => storageValue("skyagent.cacheMode", "Local browser shell only"));
-
-  function saveSettings() {
-    saveStorage("skyagent.username", username);
-    saveStorage("skyagent.profile", profile);
-    saveStorage("skyagent.priceProvider", priceProvider);
-    saveStorage("skyagent.metadataProvider", metadataProvider);
-    saveStorage("skyagent.cacheMode", cacheMode);
+function Packs({ packState, setPackState }: { packState: PackState; setPackState: (state: PackState) => void }) {
+  const [sourceUrl, setSourceUrl] = useState("file:///packs/FurfSky-Reborn.zip");
+  const [licenseAccepted, setLicenseAccepted] = useState(false);
+  const [manifestText, setManifestText] = useState(() => JSON.stringify(exampleManifest("file:///packs/FurfSky-Reborn.zip"), null, 2));
+  const [manifestStatus, setManifestStatus] = useState("manifest ready");
+  const cache = resourcePackCache();
+  function addSource() {
+    const external = packState.packs.find((pack) => pack.id !== "skyagent-generated" && pack.enabled) ?? packState.packs[1];
+    if (!licenseAccepted) {
+      setManifestStatus("accept the pack license before adding this source");
+      return;
+    }
+    let manifest: PackManifest;
+    try {
+      manifest = JSON.parse(manifestText) as PackManifest;
+      if (!manifest.license || !manifest.homepage || !manifest.textures) throw new Error("manifest requires license, homepage, and textures");
+    } catch (error) {
+      setManifestStatus(error instanceof Error ? error.message : "invalid manifest JSON");
+      return;
+    }
+    const source = createManifestSource(external, sourceUrl, manifest, licenseAccepted);
+    setPackState({
+      ...packState,
+      sources: [...packState.sources, source],
+    });
+    setManifestStatus(`added ${manifest.name}`);
   }
-
   return (
-    <Card className="panel wide">
-      <div className="panel-heading">
-        <h2>Settings</h2>
-        <Button className="text-button" onClick={saveSettings}><KeyRound size={16} /> Save Local</Button>
+    <section className="panel wide">
+      <div className="section-heading">
+        <div>
+          <h2>Resource Pack Pipeline</h2>
+          <p>External packs are configurable adapters. No third-party textures are bundled in this repo.</p>
+        </div>
+        <PackageCheck size={20} />
+      </div>
+      <div className="pack-list">
+        {packState.packs.map((pack) => (
+          <article className="pack-row" key={pack.id}>
+            <Switch.Root
+              className="switch"
+              checked={pack.enabled}
+              onCheckedChange={(enabled) => setPackState({
+                ...packState,
+                packs: packState.packs.map((entry) => entry.id === pack.id ? { ...entry, enabled } : entry),
+              })}
+            >
+              <Switch.Thumb className="switch-thumb" />
+            </Switch.Root>
+            <div>
+              <strong>{pack.name}</strong>
+              <span>{pack.author} · {pack.license}</span>
+              <small>{pack.coverage.join(", ")} · {pack.homepage}</small>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="pack-source-row">
+        <label>
+          <span>Pack source</span>
+          <input
+            value={sourceUrl}
+            onChange={(event) => {
+              const nextUrl = event.currentTarget.value;
+              setSourceUrl(nextUrl);
+              setManifestText(JSON.stringify(exampleManifest(nextUrl), null, 2));
+            }}
+          />
+        </label>
+        <Button className="action-button" onClick={addSource}>Add Source</Button>
+      </div>
+      <label className="license-row">
+        <Switch.Root className="switch" checked={licenseAccepted} onCheckedChange={setLicenseAccepted}>
+          <Switch.Thumb className="switch-thumb" />
+        </Switch.Root>
+        <span>I have the right to use this pack locally and the manifest license is accurate.</span>
+      </label>
+      <label className="manifest-field">
+        <span>Texture manifest</span>
+        <textarea value={manifestText} onChange={(event) => setManifestText(event.currentTarget.value)} />
+      </label>
+      <div className="cache-summary">
+        <strong>Manifest status</strong>
+        <span>{manifestStatus}</span>
+      </div>
+      <div className="cache-summary">
+        <strong>Texture cache</strong>
+        <span>{cache.entryCount} entries · {cache.fallbackCount} fallbacks · sources: {packState.sources.length}</span>
+      </div>
+      <div className="pack-list">
+        {packState.sources.map((source) => (
+          <article className="pack-row" key={`${source.packId}:${source.url}`}>
+            <PackageCheck size={18} />
+            <div>
+              <strong>{source.packId}</strong>
+              <span>{source.url}</span>
+              <small>
+                {source.enabled ? "enabled" : "disabled"} · {source.manifest?.providerMethod ?? "missing manifest"} · {source.manifest?.stale ? "stale" : "fresh"} · added {source.addedAt}
+              </small>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="cache-summary">
+        <strong>Latest resolutions</strong>
+        <span>
+          {cache.entries.slice(-3).map((entry) => `${entry.itemId}: ${entry.cacheStatus}/${entry.sourceFreshness}`).join(" · ") || "No texture resolutions yet"}
+        </span>
+      </div>
+    </section>
+  );
+}
+
+function SettingsView({
+  settings,
+  setSettings,
+  status,
+  onLoad,
+}: {
+  settings: GatewaySettings;
+  setSettings: (settings: GatewaySettings) => void;
+  status: string;
+  onLoad: () => void;
+}) {
+  function update(key: keyof GatewaySettings, value: string) {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    for (const [entryKey, entryValue] of Object.entries(next)) {
+      if (entryKey === "token") continue;
+      window.localStorage.setItem(`skyagent.web.${entryKey}`, entryValue);
+    }
+  }
+  return (
+    <section className="panel wide">
+      <div className="section-heading">
+        <div>
+          <h2>Gateway Settings</h2>
+          <p>Connect this dashboard to the local SkyAgent gateway. Mock data is used only when the gateway is not configured.</p>
+        </div>
+        <Settings size={20} />
       </div>
       <div className="settings-grid">
-        <Field label="Username" value={username} onChange={setUsername} placeholder="Minecraft name" />
-        <Field label="Profile" value={profile} onChange={setProfile} placeholder="Cute name or profile ID" />
-        <Field label="API key" value={apiKey} onChange={setApiKey} type="password" placeholder="Use HYPIXEL_API_KEY when possible" />
-        <Field label="Price provider" value={priceProvider} onChange={setPriceProvider} />
-        <Field label="Metadata provider" value={metadataProvider} onChange={setMetadataProvider} />
-        <Field label="Cache mode" value={cacheMode} onChange={setCacheMode} />
+        {([
+          ["baseUrl", "Gateway URL", "http://127.0.0.1:18472"],
+          ["token", "Gateway token", "local bearer token"],
+          ["player", "Player", "Minecraft username or UUID"],
+          ["profile", "Profile", "Cute name or profile ID"],
+        ] as Array<[keyof GatewaySettings, string, string]>).map(([key, label, placeholder]) => (
+          <label className="settings-field" key={key}>
+            <span>{label}</span>
+            <input
+              value={settings[key]}
+              type={key === "token" ? "password" : "text"}
+              placeholder={placeholder}
+              onChange={(event) => update(key, event.currentTarget.value)}
+            />
+          </label>
+        ))}
       </div>
-      <div className="callout">
-        <ShieldAlert size={18} />
-        <p>Secrets stay in explicit local storage or environment configuration. The UI masks API keys and does not print them back.</p>
+      <div className="cache-summary">
+        <strong>Gateway contract</strong>
+        <span>/overview, /inventory, /networth, /accessories, /progression, /provider-status · {status}</span>
       </div>
-    </Card>
+      <p className="settings-note">
+        The bearer token stays in memory for this browser tab only. It is never written to localStorage.
+      </p>
+      <Button className="action-button" onClick={onLoad}><RefreshCw size={16} /> Load Gateway Data</Button>
+    </section>
   );
 }
 
-function ActiveView(props: {
+function ActiveView({ view, live, settings, setSettings, status, onLoad, packState, setPackState }: {
   view: ViewId;
-  username: string;
-  setUsername: (value: string) => void;
-  profile: string;
-  setProfile: (value: string) => void;
-  apiKey: string;
-  setApiKey: (value: string) => void;
+  live: any;
+  settings: GatewaySettings;
+  setSettings: (settings: GatewaySettings) => void;
+  status: string;
+  onLoad: () => void;
+  packState: PackState;
+  setPackState: (state: PackState) => void;
 }) {
-  if (props.view === "inventory") return <Inventory />;
-  if (props.view === "networth") return <Networth />;
-  if (props.view === "accessories") return <Accessories />;
-  if (props.view === "progression") return <Progression />;
-  if (props.view === "planner") return <Planner />;
-  if (props.view === "settings") return <SettingsView {...props} />;
-  return <Overview username={props.username} profile={props.profile} setProfile={props.setProfile} />;
+  if (view === "inventory") return <Inventory />;
+  if (view === "networth") return <Networth live={live} />;
+  if (view === "accessories") return <Accessories packState={packState} />;
+  if (view === "progression") return <Progression />;
+  if (view === "planner") return <Planner />;
+  if (view === "packs") return <Packs packState={packState} setPackState={setPackState} />;
+  if (view === "settings") return <SettingsView settings={settings} setSettings={setSettings} status={status} onLoad={onLoad} />;
+  return <Overview live={live} onRefresh={onLoad} packState={packState} />;
 }
 
 export function App() {
-  const [view, setView] = useState<ViewId>("overview");
-  const [state, setState] = useState<LoadState>("ready");
-  const [username, setUsernameState] = useState(() => storageValue("skyagent.username", ""));
-  const [profile, setProfileState] = useState(() => storageValue("skyagent.profile", ""));
-  const [apiKey, setApiKeyState] = useState("");
-  const active = useMemo(() => views.find((entry) => entry.id === view) ?? views[0], [view]);
-
-  useEffect(() => {
-    window.localStorage.removeItem("skyagent.apiKey");
-    window.sessionStorage.removeItem("skyagent.apiKey");
-  }, []);
-
-  function setUsername(value: string) {
-    setUsernameState(value);
-    saveStorage("skyagent.username", value);
+  const [settings, setSettings] = useState<GatewaySettings>(() => ({
+    baseUrl: storageValue("skyagent.web.baseUrl", "http://127.0.0.1:18472"),
+    token: "",
+    player: storageValue("skyagent.web.player", mockProfile.username),
+    profile: storageValue("skyagent.web.profile", mockProfile.profile),
+  }));
+  const [packState, setPackState] = useState<PackState>({
+    packs: resourcePacks,
+    sources: defaultPackSources,
+  });
+  const [status, setStatus] = useState("mock fallback active");
+  const [live, setLive] = useState<any>({ profile: mockProfile });
+  async function loadGatewayData() {
+    try {
+      setStatus("loading gateway data");
+      const query = `player=${encodeURIComponent(settings.player)}&profile=${encodeURIComponent(settings.profile)}`;
+      const [overview, inventory, networth, accessoryData, progressionData, providers] = await Promise.all([
+        gatewayRequest(settings, `/overview?${query}`),
+        gatewayRequest(settings, `/inventory?${query}`),
+        gatewayRequest(settings, `/networth?${query}`),
+        gatewayRequest(settings, `/accessories?${query}`),
+        gatewayRequest(settings, `/progression?${query}`),
+        gatewayRequest(settings, "/provider-status"),
+      ]);
+      setLive({
+        profile: {
+          ...mockProfile,
+          username: settings.player || mockProfile.username,
+          profile: settings.profile || mockProfile.profile,
+          networth: networth?.networth?.total ?? mockProfile.networth,
+          magicalPower: accessoryData?.accessories?.magicalPower ?? mockProfile.magicalPower,
+        },
+        overview,
+        inventory,
+        networth,
+        accessories: accessoryData,
+        progression: progressionData,
+        providers,
+      });
+      setStatus("live gateway data loaded");
+    } catch (error) {
+      setStatus(`gateway unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      setLive({ profile: { ...mockProfile, username: settings.player || mockProfile.username, profile: settings.profile || mockProfile.profile } });
+    }
   }
-
-  function setProfile(value: string) {
-    setProfileState(value);
-    saveStorage("skyagent.profile", value);
-  }
-
-  function setApiKey(value: string) {
-    setApiKeyState(value);
-  }
-
-  function cycleState() {
-    const index = stateOrder.indexOf(state);
-    setState(stateOrder[(index + 1) % stateOrder.length]);
-  }
-
   return (
-    <div className="app-shell">
+    <Tabs.Root defaultValue="overview" className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">SA</div>
+          <div className="brand-cube" aria-hidden="true"><span /></div>
           <div>
             <strong>SkyAgent</strong>
-            <span>Hypixel SkyBlock</span>
+            <span>SkyBlock command center</span>
           </div>
         </div>
-        <nav>
-          {views.map((entry) => {
-            const Icon = entry.icon;
+        <Tabs.List className="nav-list" aria-label="SkyAgent web views">
+          {views.map((view) => {
+            const Icon = view.icon;
             return (
-              <Button className={cn("nav-item", view === entry.id && "active")} key={entry.id} onClick={() => setView(entry.id)}>
+              <Tabs.Trigger className="nav-trigger" value={view.id} key={view.id} aria-label={view.label}>
                 <Icon size={18} />
-                <span>{entry.label}</span>
-              </Button>
+                <span>{view.label}</span>
+              </Tabs.Trigger>
             );
           })}
-        </nav>
+        </Tabs.List>
       </aside>
       <main className="workspace">
         <header className="topbar">
           <div>
-            <span className="eyebrow">{active.label}</span>
-            <h1>{active.label}</h1>
+            <span className="eyebrow">Gateway local-first UI</span>
+            <h1>SkyBlock Profile Analysis</h1>
           </div>
-          <div className="top-actions">
-            <Button className="state-select" onClick={cycleState}>
-              <CalendarClock size={16} />
-              <span>{statusCopy[state].label}</span>
-              <ChevronDown size={16} />
-            </Button>
-            <Button className="icon-button" aria-label="Settings" onClick={() => setView("settings")}><Settings size={18} /></Button>
-          </div>
+          <Button className="action-button" onClick={loadGatewayData}><CircleDollarSign size={16} /> Load Gateway</Button>
         </header>
-        <StateBanner state={state} />
-        <ActiveView view={view} username={username} setUsername={setUsername} profile={profile} setProfile={setProfile} apiKey={apiKey} setApiKey={setApiKey} />
+        <ProviderStrip />
+        {views.map((view) => (
+          <Tabs.Content value={view.id} key={view.id} className="tab-content">
+            <ActiveView
+              view={view.id}
+              live={live}
+              settings={settings}
+              setSettings={setSettings}
+              status={status}
+              onLoad={loadGatewayData}
+              packState={packState}
+              setPackState={setPackState}
+            />
+          </Tabs.Content>
+        ))}
       </main>
-    </div>
+    </Tabs.Root>
   );
 }

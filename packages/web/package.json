@@ -11,28 +11,38 @@
   "files": [
     "dist",
     "src",
+    "test",
     "index.html",
     "rsbuild.config.ts",
-    "components.json"
+    "components.json",
+    "ASSET_ATTRIBUTION.md"
   ],
   "scripts": {
     "dev": "rsbuild dev",
     "build": "rsbuild build",
+    "visual:qa": "node ./test/visual-qa.mjs",
     "prepack": "bun run build",
     "preview": "rsbuild preview"
   },
   "dependencies": {
+    "@fontsource/press-start-2p": "^5.2.7",
+    "@radix-ui/react-switch": "^1.3.2",
+    "@radix-ui/react-tabs": "^1.1.16",
     "@rsbuild/core": "^1.6.8",
     "@rsbuild/plugin-react": "^1.3.5",
     "@skyagent/core": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dagre": "^0.8.5",
     "lucide-react": "^0.525.0",
+    "motion": "^12.42.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/dagre": "^0.7.54",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6"
   }
