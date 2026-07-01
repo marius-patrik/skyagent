@@ -118,6 +118,14 @@ Release automation dry-runs on pull requests and publishes only on pushes to `ma
 
 Every published release includes the standalone archives, `SHA256SUMS.txt`, and `update.json`.
 
+Standalone installs can update from GitHub Releases:
+
+```powershell
+skyagent update check --json
+skyagent update install --json
+skyagent update install --version 1.0.0 --json
+```
+
 Install from a release archive on Windows:
 
 ```powershell

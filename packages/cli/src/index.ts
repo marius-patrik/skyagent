@@ -17,6 +17,7 @@ import { profileSectionForPlayer, progressionForPlayer } from "@skyagent/core/se
 import { runSetup, setupStatus } from "@skyagent/core/setup";
 import { weightForPlayer } from "@skyagent/core/weight";
 import { gatewayCommand } from "./gateway.ts";
+import { installUpdate, parseUpdateArgs, updatePlan } from "./update.ts";
 import { webCommand } from "./web.ts";
 
 function print(value, pretty = true) {
@@ -37,6 +38,8 @@ Usage:
   skyagent setup status [--json]
   skyagent version [--json]
   skyagent doctor [--json]
+  skyagent update check [--json] [--version <version>]
+  skyagent update install [--json] [--version <version>] [--dry-run] [--restart <gateway|web|all>]
   skyagent resolve <minecraftName>
   skyagent player [nameOrUuid]
   skyagent status [nameOrUuid]
@@ -349,6 +352,19 @@ export async function command(args) {
     const compact = [action, ...rest].includes("--json");
     print(doctorStatus(), !compact);
     return;
+  }
+
+  if (area === "update") {
+    const parsed = parseUpdateArgs(rest);
+    if (action === "check") {
+      print(await updatePlan({ version: parsed.version }), !parsed.json);
+      return;
+    }
+    if (action === "install") {
+      print(await installUpdate({ version: parsed.version, dryRun: parsed.dryRun, restart: parsed.restart }), !parsed.json);
+      return;
+    }
+    throw new Error("Usage: skyagent update check|install [--version <version>] [--dry-run] [--restart <gateway|web|all>]");
   }
 
   if (area === "gateway") {

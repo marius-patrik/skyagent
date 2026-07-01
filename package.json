@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Codex plugin, CLI, and MCP tools for Hypixel SkyBlock profile analysis.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marius-patrik/skyagent.git"
+  },
   "workspaces": [
     "packages/*"
   ],
