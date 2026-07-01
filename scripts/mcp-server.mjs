@@ -2,6 +2,7 @@
 
 import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "./lib/store.mjs";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "./lib/hypixel.mjs";
+import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "./lib/profile.mjs";
 
 const tools = [
   {
@@ -84,6 +85,52 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: { player: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_profiles_summary",
+    description: "Fetch compact metadata for a player's SkyBlock profiles, including profile IDs, cute names, selected flag, bank, purse, and SkyBlock level XP. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: { player: { type: "string" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_profile_member",
+    description: "Fetch the selected player's member object from a selected SkyBlock profile by profile ID or cute name. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyblock_profile_overview",
+    description: "Fetch a compact SkyCrypt-style profile overview with economy, progression keys, inventory API signals, and profile selection metadata. Requires API key.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skycrypt_profile_url",
+    description: "Build a SkyCrypt profile URL for a Minecraft username/UUID and optional profile name.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profileName: { type: "string" },
+      },
+      required: ["player"],
       additionalProperties: false,
     },
   },
@@ -229,6 +276,27 @@ async function callTool(name, args = {}) {
       return hypixelRequest("status", { uuid: await uuidFromNameOrUuid(args.player) }, { requireKey: true });
     case "skyblock_profiles":
       return skyblockProfiles(args.player);
+    case "skyblock_profiles_summary": {
+      const uuid = await uuidFromNameOrUuid(args.player);
+      const response = await skyblockProfiles(uuid);
+      return { uuid, profiles: profileSummaries(response.body?.profiles ?? [], uuid), rateLimit: response.rateLimit };
+    }
+    case "skyblock_profile_member": {
+      const context = await fetchProfileContext(args.player, args.profile);
+      return {
+        uuid: context.uuid,
+        profile: {
+          profileId: context.profile.profile_id,
+          cuteName: context.profile.cute_name ?? null,
+        },
+        member: context.member,
+        rateLimit: context.rateLimit,
+      };
+    }
+    case "skyblock_profile_overview":
+      return compactProfileOverview(await fetchProfileContext(args.player, args.profile));
+    case "skycrypt_profile_url":
+      return { url: skycryptUrl(args.player, args.profileName) };
     case "skyblock_profile":
       return hypixelRequest("skyblock/profile", { profile: await configuredProfileId(args.profile) }, { requireKey: true });
     case "skyblock_museum":

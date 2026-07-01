@@ -28,10 +28,15 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `skyagent_config_get` first to see whether username, UUID, selected profile, and API key are configured.
 - Use `minecraft_resolve_username` when the user gives a Minecraft name and a UUID is needed.
 - Use `skyblock_profiles` to inspect the user's available SkyBlock profiles before choosing a profile-specific endpoint.
+- Use `skyblock_profiles_summary` and `skyblock_profile_overview` before asking broad progression questions; these reduce raw profile noise.
+- Use `skyblock_profile_member` when detailed per-member profile data is needed for manual analysis.
 - Use `skyblock_profile`, `skyblock_museum`, and `skyblock_garden` for profile-state analysis.
 - Use `skyblock_resource`, `skyblock_bazaar`, `skyblock_auctions`, `skyblock_auction`, `skyblock_firesales`, and `skyblock_news` for live game reference and economy context.
+- Use `skycrypt_profile_url` when the user needs a human-readable profile viewer link.
 - Use `hypixel_request` for official Hypixel v2 endpoints not covered by a dedicated tool.
 - Use SkyAgent memories for stable user preferences, selected goals, profile notes, and prior analysis summaries. Do not store secrets in memories.
+
+SkyAgent does not yet calculate SkyCrypt/SkyHelper-grade networth, weight, missing accessories, or parsed item sections. Treat those as future calculator layers unless the relevant parser/provider code exists.
 
 ## Secrets and Storage
 

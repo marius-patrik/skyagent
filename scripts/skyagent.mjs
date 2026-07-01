@@ -2,6 +2,7 @@
 
 import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "./lib/store.mjs";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "./lib/hypixel.mjs";
+import { compactProfileOverview, fetchProfileContext, profileSummaries, skycryptUrl } from "./lib/profile.mjs";
 
 function print(value, pretty = true) {
   process.stdout.write(`${JSON.stringify(value, null, pretty ? 2 : 0)}\n`);
@@ -21,7 +22,11 @@ Usage:
   skyagent player [nameOrUuid]
   skyagent status [nameOrUuid]
   skyagent profiles [nameOrUuid]
+  skyagent profiles-summary [nameOrUuid]
   skyagent profile [profileId]
+  skyagent member [nameOrUuid] [profileIdOrName]
+  skyagent overview [nameOrUuid] [profileIdOrName]
+  skyagent skycrypt [nameOrUuid] [profileName]
   skyagent museum [profileId]
   skyagent garden [profileId]
   skyagent bingo [nameOrUuid]
@@ -136,6 +141,41 @@ async function command(args) {
 
   if (area === "profiles") {
     print(await skyblockProfiles(action));
+    return;
+  }
+
+  if (area === "profiles-summary") {
+    const uuid = await uuidFromNameOrUuid(action);
+    const response = await skyblockProfiles(uuid);
+    print({
+      uuid,
+      profiles: profileSummaries(response.body?.profiles ?? [], uuid),
+      rateLimit: response.rateLimit,
+    });
+    return;
+  }
+
+  if (area === "member") {
+    const context = await fetchProfileContext(action, rest[0]);
+    print({
+      uuid: context.uuid,
+      profile: {
+        profileId: context.profile.profile_id,
+        cuteName: context.profile.cute_name ?? null,
+      },
+      member: context.member,
+      rateLimit: context.rateLimit,
+    });
+    return;
+  }
+
+  if (area === "overview") {
+    print(compactProfileOverview(await fetchProfileContext(action, rest[0])));
+    return;
+  }
+
+  if (area === "skycrypt") {
+    print({ url: skycryptUrl(action ?? publicConfig().username ?? publicConfig().uuid, rest[0]) });
     return;
   }
 

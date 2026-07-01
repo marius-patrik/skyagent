@@ -7,8 +7,7 @@
     "skyagent": "./scripts/skyagent.mjs"
   },
   "scripts": {
-    "check": "node --check scripts/skyagent.mjs && node --check scripts/mcp-server.mjs && node --check scripts/lib/hypixel.mjs && node --check scripts/lib/store.mjs"
+    "check": "node --check scripts/skyagent.mjs && node --check scripts/mcp-server.mjs && node --check scripts/lib/hypixel.mjs && node --check scripts/lib/store.mjs && node --check scripts/lib/profile.mjs"
   },
   "license": "MIT"
 }
-

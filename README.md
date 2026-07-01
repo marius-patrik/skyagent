@@ -43,6 +43,9 @@ SkyAgent stores config and memories outside the repo:
 node .\scripts\skyagent.mjs config get
 node .\scripts\skyagent.mjs resolve YourMinecraftName
 node .\scripts\skyagent.mjs profiles
+node .\scripts\skyagent.mjs profiles-summary
+node .\scripts\skyagent.mjs overview
+node .\scripts\skyagent.mjs skycrypt YourMinecraftName
 node .\scripts\skyagent.mjs resource items
 node .\scripts\skyagent.mjs bazaar
 node .\scripts\skyagent.mjs firesales
@@ -63,3 +66,5 @@ Source priority should generally be: live API data, official patch notes, offici
 ## API Notes
 
 Hypixel v2 uses the `API-Key` request header for authenticated endpoints. Rate-limit details are returned in `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers. SkyBlock item and inventory payloads can contain base64 encoded gzipped NBT data; decoding that is intentionally left for a later parser module.
+
+See `docs/parity.md` for the current gap between SkyAgent and SkyCrypt/SkyHelper-style tools.
