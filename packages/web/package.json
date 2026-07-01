@@ -1,6 +1,7 @@
 {
   "name": "@skyagent/web",
   "version": "0.1.0",
+  "description": "SkyAgent Rsbuild React TypeScript web shell with shadcn/ui-style primitives.",
   "type": "module",
   "exports": {
     ".": "./src/main.tsx"
