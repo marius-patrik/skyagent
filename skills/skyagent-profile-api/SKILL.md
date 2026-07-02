@@ -20,6 +20,9 @@ Use this skill when the task is primarily about finding the right player, profil
 - Use `skyblock_profiles` or `skyblock_profiles_summary` before profile-specific work.
 - Use `skyagent_context_bootstrap` or `skyagent_context_get` before broad profile reasoning so the agent starts from compact identity, economy, gear, pets, accessories, readiness, provider freshness, warnings, and follow-up tool links.
 - Use `skyagent_context_events`, `skyagent_context_watch`, and `skyagent_context_event_emit` to read or add context-stream events for progress, provider/cache changes, profile refreshes, or future live telemetry handoff.
+- Route full session bootstrap and profile context caching to `$skyagent-context-engine`.
+- Route live progress, server-status change history, context watch, and event emission to `$skyagent-live-progress`.
+- Route durable goal, todo, buy-list, source-list, or snipe-target state to `$skyagent-objectives`.
 - Interpret server-status `api.available: null` as unresolved local input/configuration, and `api.available: false` as a Hypixel/provider request failure.
 - Use `skyblock_profile_snapshot` for normalized profile context, profile-scoped cache reuse, session bootstrap, and deterministic cached-versus-refreshed reads. Use `refresh: true` for current Hypixel state, `cacheOnly: true` for no-refresh reads, and `allowStale: true` only when stale context is acceptable.
 - Use `skyblock_profile_overview` for compact profile context.

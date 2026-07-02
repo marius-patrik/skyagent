@@ -18,6 +18,9 @@ Use this skill when the task depends on item stacks, inventory API state, decode
 - Use `skyblock_item_dump` only when the user asks for raw decoded NBT, parser debugging, item dumps, accessory bag item dumps, or exact low-level fields.
 - Use `skyblock_normalized_items` before item reasoning across sections, upgrade checks, modifier comparisons, or user-facing item summaries.
 - Use `skyblock_item_metadata` for NotEnoughUpdates-style item details, display names, rarity, category, NPC sale data, upgrade metadata, or fallback item identity.
+- Use `$skyagent-context-engine` first for broad gear, wardrobe, pets, accessories, or profile-context questions so cached context and follow-up tool hints are available.
+- Use `$skyagent-live-progress` when recent inventory/profile refresh events may explain changed gear, pet swaps, purchases, or missing progress.
+- Use `$skyagent-objectives` when item findings should become source-item, buy-list, or snipe-target records.
 
 ## Rules
 
@@ -27,3 +30,4 @@ Use this skill when the task depends on item stacks, inventory API state, decode
 - For corrupt NBT, preserve the affected section/container ID when available, warn clearly, and continue with unaffected sections.
 - If item metadata is unavailable, continue with normalized item IDs and mark metadata-backed fields as unavailable.
 - Do not infer item modifiers that are not present in normalized records.
+- Refresh context after meaningful item changes before recalculating plans or readiness.

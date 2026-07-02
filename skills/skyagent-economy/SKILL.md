@@ -20,6 +20,10 @@ Use this skill when the user asks about coins, prices, networth, Bazaar, auction
 - Use `skyblock_networth` for full sectioned networth, purse/bank/item totals, unknown prices, assumptions, and provider freshness.
 - Use `skyblock_item_networth` for one inventory section such as armor, equipment, wardrobe, backpacks, accessory bag, or pets.
 - For agent summaries, pass bounded controls such as `maxItems`, `timeoutMs`, and `includeItems: false` when full item arrays are not required. Request item-level output only for explicit detail/debug work.
+- Use `$skyagent-context-engine` when networth or price advice should be combined with cached profile context, objectives, or provider freshness.
+- Use `$skyagent-objectives` when price evidence should update buy-list entries, source-item entries, snipe targets, budgets, target prices, warnings, or priority.
+- Use `$skyagent-live-progress` when provider/cache events, market refreshes, or recent profile changes affect valuation freshness.
+- Route patch-sensitive price-provider assumptions, parity drift, or outage checks to `$skyagent-provider-maintenance`.
 
 ## Rules
 
@@ -32,3 +36,4 @@ Use this skill when the user asks about coins, prices, networth, Bazaar, auction
 - Do not add unknown prices into networth totals; list them as missing value coverage instead.
 - When provider data is stale or low confidence, describe the value as advisory rather than definitive.
 - For budget-sensitive advice, compare resolved price against the stated budget and exclude unresolved or over-budget items from buyable recommendations.
+- When persisting economic decisions, include provider, fetched time, stale status, confidence, fallback chain, and warnings.

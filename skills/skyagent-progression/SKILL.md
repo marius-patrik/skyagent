@@ -16,6 +16,9 @@ Use this skill when the user asks where their profile stands, wants SkyCrypt-sty
 - Use `skyblock_profile_section` for one section: `skills`, `dungeons`/`catacombs`, `slayer`, `bestiary`, `collections`, `minions`, `museum`, `garden`, `mining`/`hotm`, `crimson_isle`/`kuudra`, `rift`, `trophy_fishing`, `pets`, `essence`, `currencies`, or `unlocks`.
 - Use `skyblock_progression` for all section summaries, cross-section comparisons, source-field provenance, and missing-data warnings.
 - Route Senither/Lily-style weight, unsupported exact formulas, or activity readiness to `$skyagent-readiness-weight`.
+- Use `$skyagent-context-engine` for broad progression questions so cached profile context, objective summaries, provider freshness, and follow-up tools are loaded first.
+- Use `$skyagent-live-progress` when recent skill gains, Slayer kills, dungeon runs, Garden changes, profile refreshes, or explicit progress events may affect section status.
+- Use `$skyagent-objectives` when progression gaps should become todos, source-item tasks, or tracked objective progress.
 
 ## Rules
 
@@ -24,3 +27,4 @@ Use this skill when the user asks where their profile stands, wants SkyCrypt-sty
 - Distinguish missing API data from real zero progress.
 - Treat absent sections, disabled APIs, and partial profile payloads as missing data, not as proof the user has no progress.
 - Verify current external meta before making patch-sensitive claims about Dungeons, Slayer, Kuudra, Garden, Mining, or Rift priorities.
+- Refresh context before comparing a new progression state against an existing plan.

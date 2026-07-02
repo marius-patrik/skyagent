@@ -16,6 +16,9 @@ Use this skill when the user asks whether a profile is ready for an activity, as
 - Use `skyblock_weight` for labeled profile-weight estimates, exact Senither/Lily unsupported status, formula provenance, assumptions, and missing data warnings.
 - Use `skyblock_readiness` for activity readiness in `dungeons`, `slayer`, `kuudra`, `garden`, or `mining`.
 - Use `skyblock_profile_section` or `skyblock_progression` first only when the user needs the underlying section evidence behind a readiness or weight result.
+- Use `$skyagent-context-engine` before broad readiness decisions so cached profile state, gear/pets/accessories, objectives, provider freshness, and warnings are available.
+- Use `$skyagent-live-progress` when recent profile refresh events or session progress may have changed readiness.
+- Use `$skyagent-objectives` when readiness gaps should become todos, buy-list entries, source-item tasks, or snipe targets.
 - Route pure section summaries back to `$skyagent-progression`.
 
 ## Rules
@@ -26,3 +29,4 @@ Use this skill when the user asks whether a profile is ready for an activity, as
 - Do not present heuristic readiness as a guarantee of success, party acceptance, or profit.
 - Verify current external meta before strong recommendations about F7/M7, Slayer tiers, Kuudra tiers, Garden contests, Mining methods, or patch-sensitive gear thresholds.
 - If required profile sections are missing, report readiness as unknown or partial instead of filling gaps with assumptions.
+- Refresh context after major gear, pet, accessory, or progression changes before recalculating readiness.

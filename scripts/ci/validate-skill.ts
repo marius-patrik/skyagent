@@ -163,6 +163,9 @@ export function validateSkills() {
   "skyblock_profile_overview",
   "Do not store secrets in memories",
   "$skyagent-profile-api",
+  "$skyagent-context-engine",
+  "$skyagent-objectives",
+  "$skyagent-live-progress",
   "$skyagent-inventory-items",
   "$skyagent-economy",
   "$skyagent-accessories",
@@ -176,6 +179,63 @@ export function validateSkills() {
     }
   }
 
+  const contextSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-context-engine", "SKILL.md"), "utf8");
+  for (const expected of [
+  "skyagent_context_bootstrap",
+  "skyagent_context_get",
+  "skyagent_context_refresh",
+  "skyblock_profile_snapshot",
+  "skyagent_objective_list",
+  "skyagent_server_status",
+  "$skyagent-live-progress",
+  "$skyagent-objectives",
+  "Do not store API keys or secrets",
+  ]) {
+    if (!contextSkill.includes(expected)) {
+      fail(`skyagent-context-engine must mention ${expected}`);
+    }
+  }
+
+  const objectivesSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-objectives", "SKILL.md"), "utf8");
+  for (const expected of [
+  "skyagent_objective_list",
+  "persistObjectives: true",
+  "skyagent_objective_create",
+  "skyagent_objective_update",
+  "skyagent_objective_complete",
+  "skyagent_objective_delete",
+  "buy-list",
+  "source-item",
+  "snipe targets",
+  "$skyagent-context-engine",
+  "$skyagent-live-progress",
+  "Do not write objectives during preview-only planning",
+  ]) {
+    if (!objectivesSkill.includes(expected)) {
+      fail(`skyagent-objectives must mention ${expected}`);
+    }
+  }
+
+  const liveProgressSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-live-progress", "SKILL.md"), "utf8");
+  for (const expected of [
+  "skyagent_context_events",
+  "skyagent_context_watch",
+  "skyagent_context_event_emit",
+  "skyagent_server_status",
+  "hypixel.server_status_change",
+  "provider.cache_status",
+  "provider.cache_status_change",
+  "provider/cache",
+  "future Minecraft mod telemetry",
+  "$skyagent-objectives",
+  "$skyagent-context-engine",
+  "Do not implement Minecraft mod behavior",
+  ]) {
+    if (!liveProgressSkill.includes(expected)) {
+      fail(`skyagent-live-progress must mention ${expected}`);
+    }
+  }
+
   const profileSkill = fs.readFileSync(path.join(skillsRoot, "skyagent-profile-api", "SKILL.md"), "utf8");
   for (const expected of [
   "hypixel_status",
@@ -185,6 +245,9 @@ export function validateSkills() {
   "online/status checks",
   "rate-limit",
   "HYPIXEL_API_KEY",
+  "$skyagent-context-engine",
+  "$skyagent-live-progress",
+  "$skyagent-objectives",
   ]) {
     if (!profileSkill.includes(expected)) {
       fail(`skyagent-profile-api must mention ${expected}`);
@@ -203,6 +266,9 @@ export function validateSkills() {
   "disabled inventory API",
   "partial profile data",
   "item metadata is unavailable",
+  "$skyagent-context-engine",
+  "$skyagent-live-progress",
+  "$skyagent-objectives",
   ]) {
     if (!inventorySkill.includes(expected)) {
       fail(`skyagent-inventory-items must mention ${expected}`);
@@ -222,6 +288,9 @@ export function validateSkills() {
   "market volatility",
   "Do not invent prices",
   "Do not add unknown prices into networth totals",
+  "$skyagent-context-engine",
+  "$skyagent-objectives",
+  "$skyagent-live-progress",
   ]) {
     if (!economySkill.includes(expected)) {
       fail(`skyagent-economy must mention ${expected}`);
@@ -242,6 +311,9 @@ export function validateSkills() {
   "over-budget",
   "provider confidence",
   "stale-cache warnings",
+  "$skyagent-context-engine",
+  "$skyagent-objectives",
+  "$skyagent-live-progress",
   ]) {
     if (!accessoriesSkill.includes(expected)) {
       fail(`skyagent-accessories must mention ${expected}`);
@@ -266,6 +338,9 @@ export function validateSkills() {
   "currencies",
   "unlocks",
   "missing-data limits",
+  "$skyagent-context-engine",
+  "$skyagent-objectives",
+  "$skyagent-live-progress",
   ]) {
     if (!progressionSkill.includes(expected)) {
       fail(`skyagent-progression must mention ${expected}`);
@@ -286,6 +361,9 @@ export function validateSkills() {
   "mining",
   "Verify current external meta",
   "missing-data warnings",
+  "$skyagent-context-engine",
+  "$skyagent-objectives",
+  "$skyagent-live-progress",
   ]) {
     if (!readinessSkill.includes(expected)) {
       fail(`skyagent-readiness-weight must mention ${expected}`);
@@ -305,6 +383,9 @@ export function validateSkills() {
   "skyblock_accessories",
   "skyblock_price",
   "$skyagent-provider-maintenance",
+  "$skyagent-context-engine",
+  "$skyagent-objectives",
+  "$skyagent-live-progress",
   "expected impact",
   "cost/time estimate",
   "source freshness",
@@ -328,6 +409,12 @@ export function validateSkills() {
   "Verify live web/wiki/provider data",
   "stale-cache warnings",
   "docs/parity.md",
+  "skyagent_server_status",
+  "skyagent_context_events",
+  "provider.cache_status",
+  "provider.cache_status_change",
+  "$skyagent-context-engine",
+  "$skyagent-live-progress",
   ]) {
     if (!providerSkill.includes(expected)) {
       fail(`skyagent-provider-maintenance must mention ${expected}`);

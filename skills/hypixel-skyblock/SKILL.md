@@ -1,6 +1,6 @@
 ---
 name: hypixel-skyblock
-description: Analyze Hypixel SkyBlock profiles, cached agent context, progression goals, upgrade paths, and meta-sensitive recommendations using live API data and game references.
+description: Analyze Hypixel SkyBlock profiles, cached agent context, objectives, progression goals, upgrade paths, live progress, and meta-sensitive recommendations using SkyAgent API data and game references.
 metadata:
   display_name: "Hypixel SkyBlock"
   short_description: "Orchestrate SkyAgent profile analysis."
@@ -22,14 +22,20 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 ## Default Analysis Flow
 
 1. Identify the user's concrete target and constraints.
-2. Route to the narrow SkyAgent subskill when the task is clearly profile/API, inventory/items, economy, accessories, progression, readiness/weight, planning, or provider maintenance.
-3. Pull current profile state through SkyAgent MCP tools when available.
-4. Check whether the target depends on recent patches, economy shifts, or known meta changes.
-5. Compare the user's current bottlenecks against the target.
-6. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
+2. Use `$skyagent-context-engine` for broad analysis/planning so cached profile context, provider freshness, warnings, and follow-up tools are loaded first.
+3. Use `$skyagent-objectives` to read durable goals, todos, buy lists, source lists, and snipe targets when they may affect recommendations.
+4. Use `$skyagent-live-progress` when recent context-stream events, server status, provider/cache changes, or profile refresh events may already describe the user's progress.
+5. Route to the narrow SkyAgent subskill when the task is clearly profile/API, inventory/items, economy, accessories, progression, readiness/weight, planning, or provider maintenance.
+6. Pull current profile state through SkyAgent MCP tools when available.
+7. Check whether the target depends on recent patches, economy shifts, or known meta changes.
+8. Compare the user's current bottlenecks against the target.
+9. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
 
 ## Subskill Routing
 
+- Use `$skyagent-context-engine` for session bootstrap, context capsules, profile context caching, stale-cache decisions, follow-up tool selection, provider freshness, and objective summaries before broad reasoning.
+- Use `$skyagent-objectives` for durable objectives, todos, buy-list entries, source-item lists, snipe targets, progress state, and converting accepted plans into tracked work.
+- Use `$skyagent-live-progress` for context-event reads, live progress streams, server-status changes, provider/cache changes, profile refresh events, explicit event emission, and future mod telemetry ingestion.
 - Use `$skyagent-profile-api` for player resolution, profile selection, overview, member payloads, museum, garden, bingo, or raw Hypixel endpoints.
 - Use `$skyagent-inventory-items` for inventory sections, armor, equipment, wardrobe, backpacks, accessory bag item dumps, normalized item records, NBT state, item metadata, or modifier reasoning.
 - Use `$skyagent-economy` for coin value, prices, Bazaar, auctions, LBIN, price history, networth, item networth, provider freshness, stale-cache behavior, third-party uncertainty, or market volatility.
@@ -44,7 +50,7 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `skyagent_config_get` first to see whether username, UUID, selected profile, and API key are configured.
 - Use `skyagent setup status --json` or `skyagent setup --json` from the CLI when local profile/auth bootstrap is needed; it reports missing setup requirements without printing secrets.
 - Use `minecraft_resolve_username` when the user gives a Minecraft name and a UUID is needed.
-- Use `skyagent_context_bootstrap` at session start or before broad planning to get the compact profile, economy, gear, pets, accessories, readiness, provider freshness, warnings, and follow-up tool map.
+- Use `skyagent_context_bootstrap` at session start or before broad planning to get the compact profile, economy, gear, pets, accessories, readiness, objective summary, provider freshness, warnings, and follow-up tool map.
 - Use `skyagent_context_watch` or `skyagent_context_events` when ongoing session progress, refreshes, `provider.cache_status_change`, `hypixel.server_status_change`, or explicit agent events may already be in the context stream.
 - Use `skyagent_objective_list` during session bootstrap when durable goals, todos, buy-list entries, source-list entries, or snipe targets may affect recommendations.
 - Use `skyagent_server_status` when online state, Hypixel API availability, or session mode/map matters.

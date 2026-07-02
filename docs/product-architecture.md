@@ -122,6 +122,12 @@ Planner output separates recommendations into immediate actions, todo candidates
 
 Minecraft mod telemetry is reserved as a future producer through provenance metadata only. Expected future fields include `modId`, `minecraftVersion`, `sessionId`, `world`, `location`, `inventoryDelta`, and `objectiveProgress`; this repo slice does not implement the Fabric mod.
 
+## Agent Skillset Contract
+
+The broad `$hypixel-skyblock` skill should route session-scale analysis through `$skyagent-context-engine` first, then `$skyagent-objectives` and `$skyagent-live-progress` when durable work items or recent events may change the answer. Narrow skills should keep their domain-specific tools, but reference the context, objective, and event-stream skills when profile cache, todo/buy/source/snipe state, or live progress changes matter.
+
+Skill additions and behavior changes require `bun run validate:skill` and a plugin manifest cachebuster bump so local Codex plugin installs can reload the updated skillset.
+
 ## TUI And Web
 
 The Ink TUI and React web app should use the same gateway client package or shared API schema. UI state should be local to each surface, but data fetching, errors, auth headers, and result contracts should be shared.

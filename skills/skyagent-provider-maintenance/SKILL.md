@@ -16,6 +16,10 @@ Use this skill when currentness, provider quality, stale formulas, parity drift,
 - Use `skyblock_resource` for public Hypixel resources such as items, skills, collections, election, and bingo.
 - Use `skyblock_news` for SkyBlock news when an API key is available.
 - Use economy tools to inspect provider freshness and stale-cache warnings.
+- Use `skyagent_server_status` for Hypixel API availability, online/session state, warning codes, and `hypixel.server_status_change` context events.
+- Use `skyagent_context_events` or `skyagent_context_watch` for `provider.cache_status`, `provider.cache_status_change`, `hypixel.server_status_change`, and recent refresh history.
+- Use `$skyagent-context-engine` when provider status should be carried into broad profile or planning context.
+- Use `$skyagent-live-progress` when the task is mainly about event-stream or status-change monitoring.
 - Check official Hypixel patch notes, official wiki pages, and live Hypixel API resources before community guides for patch-sensitive claims.
 - Check NEU, SkyHelper, CoflNet, SkyCrypt, and Discord-bot parity assumptions as secondary references, not authoritative truth.
 - Route concrete goal plans back to `$skyagent-planning` after verification.
