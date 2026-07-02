@@ -16,6 +16,7 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 - Use `skyblock_plan_goal` for goal-specific plans, blockers, daily/weekly routes, prerequisites, and what to skip.
 - Include `budget` when the user gives coins available.
 - Use `skyblock_next_upgrades` for purchase ranking before recommending buys.
+- Start broad plans with `skyagent_context_bootstrap` so the plan has compact cached profile, gear, pets, accessories, readiness, provider freshness, warnings, and follow-up tools before pulling narrow details.
 - Pull supporting detail with `skyblock_profile_snapshot`, `skyblock_profile_overview`, `skyblock_progression`, `skyblock_readiness`, `skyblock_networth`, `skyblock_accessories`, `skyblock_price`, or `skyblock_price_history` when the plan output needs profile, economy, progression, readiness, or price context. Prefer the snapshot cache for repeated planning passes and refresh it when current progress matters.
 - Route patch-sensitive gear, money-making, class, boss, or route claims to `$skyagent-provider-maintenance` before making strong recommendations.
 

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import {
   accessoriesForPlayer,
   accessoryUpgradesForPlayer,
+  agentContextForPlayer,
   compactProfileOverview,
   fetchProfileContext,
   hypixelRequest,
@@ -53,6 +54,7 @@ type GatewayDeps = {
   hypixelRequest: typeof hypixelRequest;
   resourceEndpoint: typeof resourceEndpoint;
   providerStatus: typeof providerStatus;
+  agentContextForPlayer: (...args: Parameters<typeof agentContextForPlayer>) => Promise<any>;
 };
 
 export type GatewayOptions = {
@@ -93,6 +95,7 @@ const defaultDeps: GatewayDeps = {
   hypixelRequest,
   resourceEndpoint,
   providerStatus,
+  agentContextForPlayer,
 };
 
 const allowedResourceKinds = new Set(["collections", "skills", "items", "election", "bingo"]);
@@ -203,6 +206,19 @@ export function createGateway(options: GatewayOptions = {}) {
         const profile = query(url, "profile");
         const overview = deps.compactProfileOverview(await deps.fetchProfileContext(player, profile));
         return json({ ok: true, overview });
+      }
+
+      if (url.pathname === "/context" && request.method === "GET") {
+        const [player, profile] = playerProfile(url);
+        return json({ ok: true, context: await deps.agentContextForPlayer(player, profile, {
+          cacheOnly: query(url, "cacheOnly") === "true" ? true : undefined,
+          allowStale: query(url, "allowStale") === "true",
+        }) });
+      }
+
+      if (url.pathname === "/context/refresh" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json({ ok: true, context: await deps.agentContextForPlayer(body.player, body.profile, { refresh: true }) });
       }
 
       if (url.pathname === "/inventory" && request.method === "GET") {
@@ -417,6 +433,17 @@ export class GatewayClient {
 
   overview(player?: string, profile?: string) {
     return this.request(queryPath("/overview", { player, profile }));
+  }
+
+  context(player?: string, profile?: string) {
+    return this.request(queryPath("/context", { player, profile }));
+  }
+
+  refreshContext(player?: string, profile?: string) {
+    return this.request("/context/refresh", {
+      method: "POST",
+      body: JSON.stringify({ player, profile }),
+    });
   }
 
   inventory(player?: string, profile?: string) {

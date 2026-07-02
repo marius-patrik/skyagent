@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "bun:test";
 import { buildProfileSnapshot, writeProfileSnapshot } from "@skyagent/core/profile-cache";
-import { callTool } from "../src/tools.ts";
+import { callTool, tools } from "../src/tools.ts";
 
 const uuid = "3206bd83fa494a5e9a1cd165a2728597";
 let tempHome: string | null = null;
@@ -49,4 +49,43 @@ test("profile snapshot MCP tool can return cached context deterministically", as
 
   expect(result.cacheStatus).toBe("hit");
   expect(result.profile).toMatchObject({ profileId: "profile-1", cuteName: "Apple" });
+});
+
+test("context MCP tools are exposed", () => {
+  const names = tools.map((tool) => tool.name);
+
+  expect(names).toContain("skyagent_context_bootstrap");
+  expect(names).toContain("skyagent_context_get");
+  expect(names).toContain("skyagent_context_refresh");
+});
+
+test("context get defaults to cached snapshot reads", async () => {
+  isolatedSkyAgentHome();
+  const fetchedAtMs = Date.now();
+  writeProfileSnapshot(buildProfileSnapshot({
+    uuid,
+    profile: {
+      profile_id: "profile-1",
+      cute_name: "Apple",
+      selected: true,
+      members: {},
+    },
+    member: {
+      currencies: { coin_purse: 12 },
+      player_data: { experience: {} },
+      pets_data: { pets: [{ type: "SHEEP", active: true, exp: 10 }] },
+    },
+    profiles: [],
+    rateLimit: null,
+  }, { ttlMs: 60_000, fetchedAtMs }));
+
+  const result = await callTool("skyagent_context_get", {
+    player: uuid,
+    profile: "Apple",
+    ttlMs: 60_000,
+  });
+
+  expect(result.kind).toBe("skyagent.agentContext");
+  expect(result.cache.status).toBe("hit");
+  expect(result.rawPayloadsIncluded).toBe(false);
 });

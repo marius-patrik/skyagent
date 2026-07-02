@@ -1,6 +1,6 @@
 ---
 name: skyagent-profile-api
-description: Fetch, cache, and summarize Hypixel SkyBlock player/profile data with SkyAgent MCP tools. Use for username resolution, profile selection, online/status checks, profile snapshots, profile overview, member payloads, museum, garden, bingo, or raw Hypixel endpoint lookup.
+description: Fetch, cache, and summarize Hypixel SkyBlock player/profile data with SkyAgent MCP tools. Use for username resolution, profile selection, online/status checks, agent context bootstrap, profile snapshots, profile overview, member payloads, museum, garden, bingo, or raw Hypixel endpoint lookup.
 metadata:
   display_name: "SkyAgent Profile/API"
   short_description: "Resolve players and fetch profile data."
@@ -18,6 +18,7 @@ Use this skill when the task is primarily about finding the right player, profil
 - Use `minecraft_resolve_username` for names that need UUIDs.
 - Use `hypixel_status` when the user asks whether a player is online or active.
 - Use `skyblock_profiles` or `skyblock_profiles_summary` before profile-specific work.
+- Use `skyagent_context_bootstrap` or `skyagent_context_get` before broad profile reasoning so the agent starts from compact identity, economy, gear, pets, accessories, readiness, provider freshness, warnings, and follow-up tool links.
 - Use `skyblock_profile_snapshot` for normalized profile context, profile-scoped cache reuse, session bootstrap, and deterministic cached-versus-refreshed reads. Use `refresh: true` for current Hypixel state, `cacheOnly: true` for no-refresh reads, and `allowStale: true` only when stale context is acceptable.
 - Use `skyblock_profile_overview` for compact profile context.
 - Use `skyblock_profile_member` only when raw member fields are needed.
@@ -36,3 +37,4 @@ Use this skill when the task is primarily about finding the right player, profil
 - If a selected profile has no member for the resolved UUID, report `missing_member` and stop before deeper analysis.
 - If rate-limit metadata is present, include remaining/reset details and avoid repeated broad fetches.
 - Prefer cached snapshots over repeated broad profile fetches when answering follow-up questions in the same session, but surface `fetchedAt`, `stale`, `cacheStatus`, and warnings whenever freshness affects the answer.
+- Use `skyagent_context_refresh` when the user says they just changed gear, pets, accessories, or progression and wants the current route recalculated.

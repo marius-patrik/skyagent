@@ -133,6 +133,7 @@ test("profiles and overview routes use injected core contracts", async () => {
         },
         rateLimit: context.rateLimit,
       }),
+      agentContextForPlayer: async (player, profile, options) => ({ player, profile, refresh: Boolean(options?.refresh), kind: "skyagent.agentContext" }),
     },
   });
 
@@ -142,6 +143,15 @@ test("profiles and overview routes use injected core contracts", async () => {
 
   const overview = await gateway.handle(request("/overview?player=Notch&profile=Apple", "test-token")).then((response) => response.json());
   expect(overview.overview.selectedProfile.profileId).toBe("profile-1");
+
+  const context = await gateway.handle(request("/context?player=Notch&profile=Apple", "test-token")).then((response) => response.json());
+  expect(context.context).toMatchObject({ player: "Notch", profile: "Apple", kind: "skyagent.agentContext" });
+
+  const refreshed = await gateway.handle(request("/context/refresh", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ player: "Notch", profile: "Apple" }),
+  })).then((response) => response.json());
+  expect(refreshed.context).toMatchObject({ player: "Notch", profile: "Apple", refresh: true });
 });
 
 test("analysis routes mirror core contracts and preserve warnings", async () => {
@@ -215,6 +225,8 @@ test("gateway client exposes analysis route helpers", async () => {
   };
 
   await client.inventorySection("armor", "Notch", "Apple");
+  await client.context("Notch", "Apple");
+  await client.refreshContext("Notch", "Apple");
   await client.normalizedItems("Notch", "Apple");
   await client.itemMetadata("ASPECT_OF_THE_END");
   await client.networth("Notch", "Apple");
@@ -232,6 +244,8 @@ test("gateway client exposes analysis route helpers", async () => {
   await client.resource("items");
 
   expect(paths).toContain("/inventory-section?section=armor&player=Notch&profile=Apple");
+  expect(paths).toContain("/context?player=Notch&profile=Apple");
+  expect(paths).toContain("/context/refresh");
   expect(paths).toContain("/items/metadata?id=ASPECT_OF_THE_END");
   expect(paths).toContain("/provider-status");
   expect(paths).toContain("/resource?kind=items");

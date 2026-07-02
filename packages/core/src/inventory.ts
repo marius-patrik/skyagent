@@ -282,6 +282,7 @@ function petItems(member: any, options: { debugRaw?: boolean } = {}) {
       type: pet.type ?? null,
       tier: pet.tier ?? null,
       exp: pet.exp ?? null,
+      active: pet.active ?? null,
       heldItem: pet.heldItem ?? null,
       skin: pet.skin ?? null,
       candyUsed: pet.candyUsed ?? null,

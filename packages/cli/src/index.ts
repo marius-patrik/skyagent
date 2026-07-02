@@ -4,6 +4,7 @@ import { createInterface } from "node:readline/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { addMemory, configPath, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
+import { agentContextForPlayer } from "@skyagent/core/agent-context";
 import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
@@ -39,6 +40,8 @@ Usage:
   skyagent setup status [--json]
   skyagent version [--json]
   skyagent doctor [--json]
+  skyagent context [nameOrUuid] [profileIdOrName] [--cache-only] [--allow-stale] [--ttl-ms <ms>]  # cached read
+  skyagent context refresh [nameOrUuid] [profileIdOrName] [--ttl-ms <ms>]
   skyagent update check [--json] [--version <version>]
   skyagent update install [--json] [--version <version>] [--dry-run] [--restart <gateway|web|all>]
   skyagent resolve <minecraftName>
@@ -207,6 +210,17 @@ export function parseProfileSnapshotArgs(args) {
   };
 }
 
+export function parseContextArgs(args) {
+  const ttl = optionValue(args, "--ttl-ms");
+  return {
+    refresh: args[0] === "refresh",
+    values: positionalArgs(args[0] === "refresh" ? args.slice(1) : args, ["--ttl-ms"]),
+    cacheOnly: args.includes("--cache-only"),
+    allowStale: args.includes("--allow-stale"),
+    ttlMs: ttl === null ? undefined : Number(ttl),
+  };
+}
+
 async function hiddenQuestion(prompt: string) {
   if (!process.stdin.isTTY || !process.stdin.setRawMode) {
     throw new Error("Hidden setup prompts require an interactive TTY. Use --api-key for non-interactive setup.");
@@ -364,6 +378,17 @@ export async function command(args) {
   if (area === "doctor") {
     const compact = [action, ...rest].includes("--json");
     print(doctorStatus(), !compact);
+    return;
+  }
+
+  if (area === "context") {
+    const parsed = parseContextArgs([action, ...rest].filter(Boolean));
+    print(await agentContextForPlayer(parsed.values[0], parsed.values[1], {
+      refresh: parsed.refresh,
+      cacheOnly: parsed.cacheOnly ? true : undefined,
+      allowStale: parsed.allowStale,
+      ttlMs: parsed.ttlMs,
+    }));
     return;
   }
 

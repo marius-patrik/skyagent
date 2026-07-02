@@ -1,4 +1,5 @@
 import { addMemory, deleteMemory, publicConfig, readMemories, setConfigValue } from "@skyagent/core/store";
+import { agentContextForPlayer } from "@skyagent/core/agent-context";
 import { accessoriesForPlayer, accessoryUpgradesForPlayer, missingAccessoriesForPlayer } from "@skyagent/core/accessories";
 import { configuredProfileId, hypixelRequest, resolveMinecraftUsername, resourceEndpoint, skyblockProfiles, uuidFromNameOrUuid } from "@skyagent/core/hypixel";
 import { inventoryForPlayer, inventorySectionForPlayer } from "@skyagent/core/inventory";
@@ -56,6 +57,49 @@ export const tools = [
       type: "object",
       properties: { id: { type: "string" } },
       required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_context_bootstrap",
+    description: "Read a cached compact SkyAgent session-start context capsule with profile identity, gear/pet/accessory/readiness summaries, provider freshness, warnings, and follow-up tools.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+        cacheOnly: { type: "boolean" },
+        allowStale: { type: "boolean" },
+        ttlMs: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_context_get",
+    description: "Read the cached compact SkyAgent context capsule without forcing a snapshot refresh.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+        cacheOnly: { type: "boolean" },
+        allowStale: { type: "boolean" },
+        ttlMs: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "skyagent_context_refresh",
+    description: "Refresh and return the compact SkyAgent context capsule from current Hypixel profile data.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        player: { type: "string" },
+        profile: { type: "string" },
+        ttlMs: { type: "number" },
+      },
       additionalProperties: false,
     },
   },
@@ -536,6 +580,18 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
       return readMemories();
     case "skyagent_memory_delete":
       return deleteMemory(args.id);
+    case "skyagent_context_bootstrap":
+    case "skyagent_context_get":
+      return agentContextForPlayer(args.player, args.profile, {
+        cacheOnly: Object.prototype.hasOwnProperty.call(args, "cacheOnly") ? Boolean(args.cacheOnly) : undefined,
+        allowStale: Boolean(args.allowStale),
+        ttlMs: args.ttlMs,
+      });
+    case "skyagent_context_refresh":
+      return agentContextForPlayer(args.player, args.profile, {
+        refresh: true,
+        ttlMs: args.ttlMs,
+      });
     case "minecraft_resolve_username":
       return resolveMinecraftUsername(args.username);
     case "hypixel_player":

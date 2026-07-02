@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { command, doctorStatus, parseAccessoryUpgradeArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
@@ -106,6 +106,20 @@ describe("CLI argument parsing", () => {
       cacheOnly: true,
       allowStale: true,
       ttlMs: undefined,
+    });
+  });
+
+  test("context parses refresh and cache controls", () => {
+    expect(parseContextArgs(["Notch", "Apple", "--cache-only", "--allow-stale", "--ttl-ms", "60000"])).toEqual({
+      refresh: false,
+      values: ["Notch", "Apple"],
+      cacheOnly: true,
+      allowStale: true,
+      ttlMs: 60_000,
+    });
+    expect(parseContextArgs(["refresh", "Notch", "Apple"])).toMatchObject({
+      refresh: true,
+      values: ["Notch", "Apple"],
     });
   });
 

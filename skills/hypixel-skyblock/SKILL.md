@@ -1,6 +1,6 @@
 ---
 name: hypixel-skyblock
-description: Analyze Hypixel SkyBlock profiles, cached profile context, progression goals, upgrade paths, and meta-sensitive recommendations using live API data and game references.
+description: Analyze Hypixel SkyBlock profiles, cached agent context, progression goals, upgrade paths, and meta-sensitive recommendations using live API data and game references.
 metadata:
   display_name: "Hypixel SkyBlock"
   short_description: "Orchestrate SkyAgent profile analysis."
@@ -44,8 +44,9 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `skyagent_config_get` first to see whether username, UUID, selected profile, and API key are configured.
 - Use `skyagent setup status --json` or `skyagent setup --json` from the CLI when local profile/auth bootstrap is needed; it reports missing setup requirements without printing secrets.
 - Use `minecraft_resolve_username` when the user gives a Minecraft name and a UUID is needed.
+- Use `skyagent_context_bootstrap` at session start or before broad planning to get the compact profile, economy, gear, pets, accessories, readiness, provider freshness, warnings, and follow-up tool map.
 - Use `skyblock_profiles` to inspect the user's available SkyBlock profiles before choosing a profile-specific endpoint.
-- Use `skyblock_profile_snapshot` for broad agent context and repeated analysis. Prefer `cacheOnly` for session bootstrap when a recent snapshot is enough, `refresh` when the user asks for current state, and `allowStale` only when explicitly accepting stale context.
+- Use `skyblock_profile_snapshot` for normalized profile-cache reads and repeated narrow analysis after bootstrap. Prefer `skyagent_context_bootstrap` for session bootstrap and broad context capsules; use `refresh` when the user asks for current state and `allowStale` only when explicitly accepting stale context.
 - Use `skyblock_profiles_summary` and `skyblock_profile_overview` before asking broad progression questions; these reduce raw profile noise.
 - Use `skyblock_profile_member` when detailed per-member profile data is needed for manual analysis.
 - Use `skyblock_inventory`, `skyblock_inventory_section`, and `skyblock_item_dump` when item stacks, inventory API state, armor/equipment/wardrobe, backpacks, accessory bag, personal vault, or raw decoded item payloads are needed.
