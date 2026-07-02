@@ -38,7 +38,7 @@ function nextVersion(previous: ReturnType<typeof parseVersion>, bump: "patch" | 
 }
 
 function eventJson() {
-  const eventPath = process.env.GITHUB_EVENT_PATH;
+  const eventPath = process.env.SKYAGENT_GITHUB_EVENT_PATH ?? process.env.GITHUB_EVENT_PATH;
   if (!eventPath || !fs.existsSync(eventPath)) return null;
   return JSON.parse(fs.readFileSync(eventPath, "utf8"));
 }

@@ -82,6 +82,8 @@ jobs:
       - name: Checkout trusted merge context
         if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Squash merge PR
         if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
@@ -95,3 +97,79 @@ jobs:
             --squash \
             --delete-branch \
             --match-head-commit "$HEAD_SHA"
+
+      - name: Checkout merged main
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        shell: bash
+        run: |
+          git fetch origin main --tags
+          git checkout origin/main
+          release_sha="$(git rev-parse HEAD)"
+          event_path="$RUNNER_TEMP/skyagent-automerge-push-event.json"
+          cat > "$event_path" <<JSON
+          {"ref":"refs/heads/main","after":"$release_sha","repository":{"full_name":"${{ github.repository }}"}}
+          JSON
+          echo "SKYAGENT_AUTOMERGE_RELEASE_SHA=$release_sha" >> "$GITHUB_ENV"
+          echo "SKYAGENT_GITHUB_EVENT_PATH=$event_path" >> "$GITHUB_ENV"
+
+      - name: Set up Bun
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install release build tools
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' && runner.os == 'Linux' }}
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zip
+
+      - name: Install dependencies
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        run: bun install --frozen-lockfile
+
+      - name: Plan release for merged main
+        id: release_plan
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ env.SKYAGENT_AUTOMERGE_RELEASE_SHA }}
+          SKYAGENT_GITHUB_EVENT_PATH: ${{ env.SKYAGENT_GITHUB_EVENT_PATH }}
+          GITHUB_REF: refs/heads/main
+          GITHUB_EVENT_NAME: push
+        run: bun ./scripts/plan-release.ts
+
+      - name: Build release artifacts
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        run: bun run build:release -- --version "${{ steps.release_plan.outputs.version }}"
+
+      - name: Smoke current release artifact
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        run: bun ./scripts/smoke-release.ts "${{ steps.release_plan.outputs.version }}"
+
+      - name: Write release metadata
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        run: bun ./scripts/write-release-metadata.ts "${{ steps.release_plan.outputs.version }}"
+
+      - name: Publish GitHub Release
+        if: ${{ steps.find.outputs.eligible == 'true' && steps.gates.outputs.passed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release_plan.outputs.tag }}
+          RELEASE_TARGET: ${{ env.SKYAGENT_AUTOMERGE_RELEASE_SHA }}
+        shell: bash
+        run: |
+          if existing_target="$(gh release view "$RELEASE_TAG" --json targetCommitish --jq .targetCommitish 2>/dev/null)"; then
+            if [ "$existing_target" = "$RELEASE_TARGET" ]; then
+              echo "Release $RELEASE_TAG already exists for $RELEASE_TARGET; skipping duplicate publish."
+              exit 0
+            fi
+            echo "::error::Release $RELEASE_TAG already exists for $existing_target, not $RELEASE_TARGET."
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            dist/release/skyagent-*.zip \
+            dist/release/SHA256SUMS.txt \
+            dist/release/update.json \
+            --target "$RELEASE_TARGET" \
+            --title "SkyAgent $RELEASE_TAG" \
+            --notes-file dist/release/RELEASE_NOTES.md
