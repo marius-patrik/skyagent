@@ -58,7 +58,7 @@ test("setup status redacts secrets and reports install metadata", () => {
 
   const status = setupStatus();
 
-  expect(status.version).toBe("0.1.0");
+  expect(status.version).toBe("2.0.0");
   expect(status.dataDir).toBe(tempHome);
   expect(status.config).toEqual(publicConfig());
 });

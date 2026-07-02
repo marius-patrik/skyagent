@@ -30,11 +30,19 @@ import {
   serverStatusForPlayer,
   setLlmProviderConfigValue,
   setConfigValue,
+  startSkyAgentSession,
+  streamLlmChat,
   subscribeContextEvents,
   skyblockProfiles,
   uuidFromNameOrUuid,
   weightForPlayer,
+  listObjectiveItems,
+  objectiveContextSummary,
+  createObjectiveItem,
+  updateObjectiveItem,
+  completeObjectiveItem,
 } from "@skyagent/core";
+import { createAgentRuntime } from "./agent.ts";
 
 type GatewayDeps = {
   publicConfig: typeof publicConfig;
@@ -71,12 +79,20 @@ type GatewayDeps = {
   emitContextEvent: typeof emitContextEvent;
   emitProviderStatusEvent: typeof emitProviderStatusEvent;
   subscribeContextEvents: typeof subscribeContextEvents;
+  startSkyAgentSession: typeof startSkyAgentSession;
+  streamLlmChat: typeof streamLlmChat;
+  listObjectiveItems: typeof listObjectiveItems;
+  objectiveContextSummary: typeof objectiveContextSummary;
+  createObjectiveItem: typeof createObjectiveItem;
+  updateObjectiveItem: typeof updateObjectiveItem;
+  completeObjectiveItem: typeof completeObjectiveItem;
 };
 
 export type GatewayOptions = {
   token?: string;
   version?: string;
   deps?: Partial<GatewayDeps>;
+  agentSessionPath?: string | null;
 };
 
 export type StartGatewayOptions = GatewayOptions & {
@@ -120,6 +136,13 @@ const defaultDeps: GatewayDeps = {
   emitContextEvent,
   emitProviderStatusEvent,
   subscribeContextEvents,
+  startSkyAgentSession,
+  streamLlmChat,
+  listObjectiveItems,
+  objectiveContextSummary,
+  createObjectiveItem,
+  updateObjectiveItem,
+  completeObjectiveItem,
 };
 
 const allowedResourceKinds = new Set(["collections", "skills", "items", "election", "bingo"]);
@@ -165,6 +188,10 @@ function sseEvent(event: any) {
   return `id: ${event.sequence}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
+function agentSseEvent(event: any) {
+  return `event: ${event.type ?? "message"}\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
 function playerProfile(url: URL) {
   return [query(url, "player"), query(url, "profile")] as const;
 }
@@ -204,8 +231,18 @@ function validateNonSecretProviderBaseUrl(value: unknown) {
 
 export function createGateway(options: GatewayOptions = {}) {
   const token = options.token ?? randomToken();
-  const version = options.version ?? "0.1.0";
+  const version = options.version ?? "2.0.0";
   const deps: GatewayDeps = { ...defaultDeps, ...options.deps };
+  const agent = createAgentRuntime({
+    startSkyAgentSession: deps.startSkyAgentSession,
+    streamLlmChat: deps.streamLlmChat,
+    listObjectiveItems: deps.listObjectiveItems,
+    objectiveContextSummary: deps.objectiveContextSummary,
+    createObjectiveItem: deps.createObjectiveItem,
+    updateObjectiveItem: deps.updateObjectiveItem,
+    completeObjectiveItem: deps.completeObjectiveItem,
+    sessionPath: options.agentSessionPath,
+  });
 
   async function handle(request: Request) {
     const url = new URL(request.url);
@@ -457,6 +494,80 @@ export function createGateway(options: GatewayOptions = {}) {
         return json({ ok: true, config });
       }
 
+      if (url.pathname === "/agent/start" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json({ ok: true, agent: await agent.start(body) });
+      }
+
+      if (url.pathname === "/agent/status" && request.method === "GET") {
+        return json({ ok: true, agent: agent.history() });
+      }
+
+      if (url.pathname === "/agent/stop" && request.method === "POST") {
+        return json({ ok: true, agent: agent.stop() });
+      }
+
+      if (url.pathname === "/agent/history" && request.method === "GET") {
+        return json({ ok: true, agent: agent.history() });
+      }
+
+      if (url.pathname === "/agent/context/refresh" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json({ ok: true, agent: await agent.refreshContext(body) });
+      }
+
+      if (url.pathname === "/agent/objectives" && request.method === "GET") {
+        return json({ ok: true, objectives: agent.objectives("list", {
+          kind: query(url, "kind"),
+          status: query(url, "status"),
+          includeDeleted: query(url, "includeDeleted") === "true",
+        }) });
+      }
+
+      if (url.pathname === "/agent/objectives" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        return json({ ok: true, objective: agent.objectives(body.action ?? "create", body) });
+      }
+
+      if (url.pathname === "/agent/message" && request.method === "POST") {
+        const body = await parseJsonBody(request);
+        if (body.stream === false) {
+          const events = [];
+          let text = "";
+          for await (const event of agent.message(body)) {
+            events.push(event);
+            if (event.type === "text_delta") text += (event as any).text;
+            if (event.type === "agent_done" && (event as any).message?.content) text = (event as any).message.content;
+          }
+          return json({ ok: true, text, events, agent: agent.history() });
+        }
+
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              for await (const event of agent.message(body)) {
+                controller.enqueue(encoder.encode(agentSseEvent(event)));
+              }
+            } catch (error) {
+              controller.enqueue(encoder.encode(agentSseEvent({
+                type: "error",
+                error: error instanceof Error ? error.message : String(error),
+              })));
+            } finally {
+              controller.close();
+            }
+          },
+        });
+        return new Response(stream, {
+          headers: {
+            "content-type": "text/event-stream; charset=utf-8",
+            "cache-control": "no-cache",
+            connection: "keep-alive",
+          },
+        });
+      }
+
       if (url.pathname === "/resource" && request.method === "GET") {
         const kind = query(url, "kind");
         if (!kind) return errorResponse(400, "missing_resource_kind", "Query parameter kind is required.");
@@ -480,6 +591,9 @@ export function createGateway(options: GatewayOptions = {}) {
 export function startGateway(options: StartGatewayOptions = {}) {
   const gateway = createGateway(options);
   const host = options.host ?? "127.0.0.1";
+  if (host !== "127.0.0.1") {
+    throw new Error("SkyAgent gateway only supports local loopback binds on 127.0.0.1.");
+  }
   let server: ReturnType<typeof Bun.serve>;
   server = Bun.serve({
     hostname: host,
@@ -678,6 +792,92 @@ export class GatewayClient {
       method: "POST",
       body: JSON.stringify(config),
     });
+  }
+
+  startAgent(input: Record<string, unknown> = {}) {
+    return this.request("/agent/start", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  agentStatus() {
+    return this.request("/agent/status");
+  }
+
+  stopAgent() {
+    return this.request("/agent/stop", { method: "POST" });
+  }
+
+  agentHistory() {
+    return this.request("/agent/history");
+  }
+
+  refreshAgentContext(input: Record<string, unknown> = {}) {
+    return this.request("/agent/context/refresh", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  agentObjectives(input: Record<string, unknown> = {}) {
+    const method = input.action ? "POST" : "GET";
+    if (method === "GET") {
+      return this.request(queryPath("/agent/objectives", input as Record<string, string | number | null | undefined>));
+    }
+    return this.request("/agent/objectives", {
+      method,
+      body: JSON.stringify(input),
+    });
+  }
+
+  messageAgent(input: Record<string, unknown>) {
+    return this.request("/agent/message", {
+      method: "POST",
+      body: JSON.stringify({ ...input, stream: false }),
+    });
+  }
+
+  async streamAgentMessage(input: Record<string, unknown>, onEvent: (event: any) => void) {
+    const response = await fetch(`${this.baseUrl}/agent/message`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ ...input, stream: true }),
+    });
+    if (!response.ok) {
+      const body = await response.json();
+      throw Object.assign(new Error(body?.error?.message ?? `Gateway request failed: HTTP ${response.status}`), { response, body });
+    }
+    if (!response.body) {
+      throw new Error("Gateway response did not include an agent stream.");
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      let boundary = buffer.search(/\r?\n\r?\n/);
+      while (boundary !== -1) {
+        const block = buffer.slice(0, boundary);
+        const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
+        buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
+        for (const line of block.split(/\r?\n/).filter((entry) => entry.startsWith("data:"))) {
+          onEvent(JSON.parse(line.slice("data:".length).trim()));
+        }
+        boundary = buffer.search(/\r?\n\r?\n/);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      for (const line of buffer.split(/\r?\n/).filter((entry) => entry.startsWith("data:"))) {
+        onEvent(JSON.parse(line.slice("data:".length).trim()));
+      }
+    }
   }
 
   resource(kind: string) {

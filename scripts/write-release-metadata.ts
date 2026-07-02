@@ -5,7 +5,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dir, "..");
-const outDir = path.join(root, "dist", "release");
+const outDir = process.env.SKYAGENT_RELEASE_OUT_DIR
+  ? path.resolve(process.env.SKYAGENT_RELEASE_OUT_DIR)
+  : path.join(root, "dist", "release");
 const version = process.argv[2];
 
 if (!version) {

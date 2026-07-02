@@ -26,7 +26,7 @@ async function handle(message) {
         send(response(message.id, {
           protocolVersion: message.params?.protocolVersion ?? "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "skyagent", version: "0.1.0" },
+          serverInfo: { name: "skyagent", version: "2.0.0" },
         }));
         break;
       case "tools/list":

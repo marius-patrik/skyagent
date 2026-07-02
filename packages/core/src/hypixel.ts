@@ -76,7 +76,7 @@ export async function hypixelRequest(endpoint: string, query: Record<string, unk
   }
 
   const headers: Record<string, string> = {
-    "User-Agent": "skyagent/0.1.0",
+    "User-Agent": "skyagent/2.0.0",
   };
   const apiKey = options.apiKey || getApiKey(config);
   if (apiKey) {

@@ -1,21 +1,25 @@
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
 import { emitContextEvent } from "@skyagent/core/context-events";
 import { publicLlmProviderConfig } from "@skyagent/core/llm-provider";
 import { listObjectiveItems } from "@skyagent/core/objectives";
+import { stopGatewayProcess } from "@skyagent/gateway/manager";
 import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
 
-afterEach(() => {
+afterEach(async () => {
+  await stopGatewayProcess();
   if (tempHome) {
     fs.rmSync(tempHome, { recursive: true, force: true });
     tempHome = null;
   }
   delete process.env.SKYAGENT_HOME;
+  delete process.env.SKYAGENT_GATEWAY_PORT;
   delete process.env.SKYAGENT_LITELLM_API_KEY;
   delete process.env.SKYAGENT_LITELLM_BASE_URL;
   delete process.env.SKYAGENT_LLM_MODEL;
@@ -25,6 +29,18 @@ afterEach(() => {
 function isolatedSkyAgentHome() {
   tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-cli-test-"));
   process.env.SKYAGENT_HOME = tempHome;
+  process.env.SKYAGENT_GATEWAY_PORT = String(20_000 + Math.floor(Math.random() * 20_000));
+}
+
+async function freePort() {
+  return await new Promise<number>((resolve, reject) => {
+    const server = net.createServer();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => resolve(typeof address === "object" && address ? address.port : 0));
+    });
+  });
 }
 
 describe("CLI argument parsing", () => {
@@ -245,9 +261,10 @@ describe("CLI argument parsing", () => {
 
   test("start command reports setup gaps without live credentials", async () => {
     isolatedSkyAgentHome();
+    process.env.SKYAGENT_GATEWAY_PORT = String(await freePort());
 
-    await command(["start", "--json"]);
-  });
+    await command(["start", "--json", "--cache-only", "--allow-stale"]);
+  }, 10_000);
 
   test("json flag is not interpreted as player for no-live status/context commands", async () => {
     isolatedSkyAgentHome();
@@ -397,7 +414,7 @@ describe("CLI argument parsing", () => {
     await command(["doctor", "--json"]);
     expect(doctorStatus()).toMatchObject({
       ok: true,
-      version: "0.1.0",
+      version: "2.0.0",
       runtime: {
         platform: process.platform,
         arch: process.arch,
@@ -483,5 +500,21 @@ describe("CLI argument parsing", () => {
     const exitCode = await proc.exited;
     expect(exitCode).toBe(1);
     expect(stderr).toContain("Usage: skyagent plan");
+  });
+
+  test("CLI package entry exposes tui smoke snapshot", async () => {
+    const proc = Bun.spawn(["bun", "./packages/cli/src/bin.ts", "tui", "--smoke"], {
+      cwd: path.resolve(import.meta.dir, "../../.."),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stdout = await new Response(proc.stdout).json();
+    const stderr = await new Response(proc.stderr).text();
+    const exitCode = await proc.exited;
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout.surface).toBe("tui");
+    expect(stdout.screens).toContain("agent");
   });
 });

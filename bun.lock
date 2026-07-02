@@ -20,26 +20,27 @@
     },
     "packages/cli": {
       "name": "@skyagent/cli",
-      "version": "0.1.0",
+      "version": "2.0.0",
       "bin": {
         "skyagent": "./src/bin.ts",
       },
       "dependencies": {
         "@skyagent/core": "workspace:*",
         "@skyagent/gateway": "workspace:*",
+        "@skyagent/tui": "workspace:*",
         "@skyagent/web": "workspace:*",
       },
     },
     "packages/core": {
       "name": "@skyagent/core",
-      "version": "0.1.0",
+      "version": "2.0.0",
       "dependencies": {
         "prismarine-nbt": "^2.8.0",
       },
     },
     "packages/gateway": {
       "name": "@skyagent/gateway",
-      "version": "0.1.0",
+      "version": "2.0.0",
       "bin": {
         "skyagent-gateway": "./src/bin.ts",
       },
@@ -49,14 +50,14 @@
     },
     "packages/mcp": {
       "name": "@skyagent/mcp",
-      "version": "0.1.0",
+      "version": "2.0.0",
       "dependencies": {
         "@skyagent/core": "workspace:*",
       },
     },
     "packages/tui": {
       "name": "@skyagent/tui",
-      "version": "0.1.0",
+      "version": "2.0.0",
       "bin": {
         "skyagent-tui": "./src/bin.ts",
       },
@@ -72,7 +73,7 @@
     },
     "packages/web": {
       "name": "@skyagent/web",
-      "version": "0.1.0",
+      "version": "2.0.0",
       "dependencies": {
         "@fontsource/press-start-2p": "^5.2.7",
         "@radix-ui/react-switch": "^1.3.2",

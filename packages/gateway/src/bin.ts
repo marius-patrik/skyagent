@@ -18,12 +18,16 @@ if (!token) {
   process.stderr.write("skyagent gateway requires --token=<token> or --token-file=<path>. Process-managed token persistence is added by the CLI gateway commands.\n");
   process.exit(1);
 }
+if (host !== "127.0.0.1") {
+  process.stderr.write("skyagent gateway only supports --host=127.0.0.1 so the local agent server is not exposed publicly.\n");
+  process.exit(1);
+}
 
 const gateway = startGateway({
   port: portArg ? Number(portArg.slice("--port=".length)) : 0,
   host,
   token,
-  allowShutdown: ["127.0.0.1", "localhost", "::1"].includes(host),
+  allowShutdown: true,
 });
 
 process.stdout.write(`${JSON.stringify(gateway.status, null, 2)}\n`);

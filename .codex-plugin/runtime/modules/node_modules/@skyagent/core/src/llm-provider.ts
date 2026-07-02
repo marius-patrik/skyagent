@@ -45,12 +45,33 @@ export type PublicLlmProviderConfig = Omit<ResolvedLlmProviderConfig, "baseUrl">
   baseUrl: string | null;
 };
 
-export type LlmMessage = {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  name?: string;
-  tool_call_id?: string;
+export type LlmToolCall = {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
 };
+
+export type LlmMessage =
+  | {
+    role: "system" | "user";
+    content: string;
+    name?: string;
+  }
+  | {
+    role: "assistant";
+    content: string;
+    name?: string;
+    tool_calls?: LlmToolCall[];
+  }
+  | {
+    role: "tool";
+    content: string;
+    name?: string;
+    tool_call_id: string;
+  };
 
 export type LlmTool = {
   type: "function";

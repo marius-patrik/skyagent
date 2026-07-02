@@ -16,7 +16,8 @@ The goal is to connect Codex to live player data, game reference data, and curat
 - `packages/core` contains shared Hypixel/Mojang API clients, profile helpers, config, memories, LLM provider routing, and parsers/calculators.
 - `packages/cli` contains the Bun-powered JSON CLI command implementation.
 - `packages/mcp` contains the Bun-powered MCP server used by Codex.
-- `packages/tui` contains the future interactive terminal UI surface and depends on `@skyagent/core`.
+- `packages/gateway` contains the local-only HTTP backend and persistent LiteLLM-backed agent runtime.
+- `packages/tui` contains the Ink interactive terminal UI surface and attaches to the gateway.
 - `packages/web` contains the future Bun + Rsbuild + React + TypeScript + shadcn/ui web app surface and depends on `@skyagent/core`.
 - `scripts/skyagent.ts` and `scripts/mcp-server.ts` are compatibility wrappers for the root binary and plugin manifest.
 - `assets/` is reserved for plugin assets and reference fixtures.
@@ -75,6 +76,7 @@ Provider status redacts tokens and auth material. The HTTP gateway can write non
 ```powershell
 bun .\scripts\skyagent.ts version
 bun .\scripts\skyagent.ts doctor
+bun .\scripts\skyagent.ts start --json
 bun .\scripts\skyagent.ts config get
 bun .\scripts\skyagent.ts provider status
 bun .\scripts\skyagent.ts resolve YourMinecraftName
@@ -106,6 +108,8 @@ bun .\scripts\skyagent.ts bazaar
 bun .\scripts\skyagent.ts firesales
 bun .\scripts\skyagent.ts memory add "Working toward F7 completion" goal dungeon
 ```
+
+`skyagent start` starts or reuses the local gateway on `127.0.0.1`, triggers the SkyAgent session-start hook, builds the profile context capsule, records the session-start context event, and returns persistent-agent readiness for CLI, TUI, MCP, and future web clients. Direct non-interactive commands such as `inventory`, `plan`, `price`, and `objective` remain available without going through the TUI.
 
 ## Package Commands
 
@@ -178,7 +182,7 @@ Launch the interactive terminal UI with:
 bun .\scripts\skyagent.ts tui
 ```
 
-The TUI opens directly into config/status, profile selection, profile overview, raw API/debug launcher, and advanced-section status screens. It uses keyboard navigation (`up`/`down` or `j`/`k` for screens, `left`/`right` or `h`/`l` for lists, `enter`, `r`, `q`) and never prints API key values. The initial implementation uses Node `readline` primitives instead of a rendering dependency to keep Windows Terminal, VS Code terminal, and GitHub Actions smoke behavior predictable. CI can initialize the same entry point without live credentials through:
+The TUI opens directly into an agent chat surface backed by the same local gateway session as `skyagent start`. It also includes config/status, profile selection, profile overview, raw API/debug launcher, and advanced-section screens. It uses keyboard navigation (`up`/`down` or `j`/`k` for screens, `left`/`right` or `h`/`l` for lists, `enter`, `r`, `q`) and never prints API key values. CI can initialize the same entry point without live credentials through:
 
 ```powershell
 bun .\scripts\skyagent.ts tui --smoke

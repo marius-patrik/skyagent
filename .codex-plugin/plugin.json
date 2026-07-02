@@ -1,6 +1,6 @@
 {
   "name": "skyagent",
-  "version": "0.1.0+codex.20260702162502",
+  "version": "2.0.0+codex.20260702180222",
   "description": "Codex plugin for Hypixel SkyBlock profile analysis and meta planning.",
   "author": {
     "name": "Patrik"

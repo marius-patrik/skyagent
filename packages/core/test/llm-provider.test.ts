@@ -179,6 +179,64 @@ describe("LLM provider abstraction", () => {
     }
   });
 
+  test("serializes assistant tool calls and tool result messages for LiteLLM follow-up requests", async () => {
+    const requests: any[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (request) => {
+        const url = new URL(request.url);
+        expect(url.pathname).toBe("/v1/chat/completions");
+        requests.push(await request.json());
+        return new Response("data: [DONE]\n\n", {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        });
+      },
+    });
+
+    try {
+      for await (const _event of streamLlmChat({
+        messages: [
+          { role: "user", content: "track this buy list" },
+          {
+            role: "assistant",
+            content: "",
+            tool_calls: [{
+              id: "call_buy_1",
+              type: "function",
+              function: {
+                name: "skyagent_objective_create",
+                arguments: "{\"kind\":\"buy\",\"title\":\"Buy Hyperion\"}",
+              },
+            }],
+          },
+          {
+            role: "tool",
+            tool_call_id: "call_buy_1",
+            name: "skyagent_objective_create",
+            content: "{\"id\":\"buy_1\",\"status\":\"open\"}",
+          },
+        ],
+        toolChoice: "none",
+      }, { config: providerConfig({ baseUrl: `http://127.0.0.1:${server.port}` }) })) {
+        // Drain the stream so the request body is captured.
+      }
+
+      expect(requests[0]).toMatchObject({
+        model: "skyagent-codex",
+        stream: true,
+        tool_choice: "none",
+        messages: [
+          { role: "user", content: "track this buy list" },
+          { role: "assistant", tool_calls: [{ id: "call_buy_1", type: "function" }] },
+          { role: "tool", tool_call_id: "call_buy_1", name: "skyagent_objective_create" },
+        ],
+      });
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("streams OpenAI-compatible Responses events from the same abstraction", async () => {
     const requests: any[] = [];
     const stream = [

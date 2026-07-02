@@ -15,6 +15,7 @@ type PreparePluginRuntimeOptions = {
 };
 
 const repoRoot = path.resolve(import.meta.dir, "..");
+const packageVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version ?? "0.0.0";
 const nodeModulesDir = path.join(repoRoot, "node_modules");
 const runtimeModulesDir = path.join(repoRoot, ".codex-plugin", "runtime", "modules");
 const runtimeRootNodeModulesDir = path.join(repoRoot, ".codex-plugin", "runtime", "root-node_modules");
@@ -243,7 +244,7 @@ function writePackageShim(packageDir: string, packageName: string, exports: Reco
   }
   fs.writeFileSync(path.join(packageDir, "package.json"), `${JSON.stringify({
     name: packageName,
-    version: "0.1.0",
+    version: packageVersion,
     type: "module",
     private: true,
     exports: packageExports,
@@ -310,7 +311,7 @@ export function preparePluginRuntime(targetModulesDir = runtimeModulesDir, optio
 
     fs.writeFileSync(path.join(shimDir, "package.json"), `${JSON.stringify({
       name: `@skyagent/${shim.name}`,
-      version: "0.1.0",
+      version: packageVersion,
       type: "module",
       private: true,
       exports,

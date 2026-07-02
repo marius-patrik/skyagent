@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
 import { createGateway, GatewayClient, startGateway } from "../src/index.ts";
+import fs from "node:fs";
+import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 
 function request(path: string, token?: string, init: RequestInit = {}) {
@@ -9,6 +12,20 @@ function request(path: string, token?: string, init: RequestInit = {}) {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...init.headers,
     },
+  });
+}
+
+async function freePort() {
+  return await new Promise<number>((resolve, reject) => {
+    const server = net.createServer();
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => {
+        if (address && typeof address === "object") resolve(address.port);
+        else reject(new Error("Unable to allocate free port"));
+      });
+    });
   });
 }
 
@@ -341,6 +358,353 @@ test("server status and context event routes expose JSON and SSE contracts", asy
   expect(new TextDecoder().decode(first.value)).toContain("event: gateway.test");
 });
 
+test("persistent agent routes start sessions, stream through LiteLLM, and wrap objectives", async () => {
+  let startCount = 0;
+  let objective = { id: "obj-1", title: "Buy Juju", status: "open" };
+  const gateway = createGateway({
+    token: "test-token",
+    agentSessionPath: null,
+    deps: ({
+      startSkyAgentSession: async (input) => {
+        startCount += 1;
+        return {
+          kind: "skyagent.startup",
+          generatedAt: "2026-07-02T00:00:00.000Z",
+          player: { input: input.player ?? "Notch", username: "Notch" },
+          selectedProfile: { profileId: input.profile ?? "profile-1", cuteName: "Apple" },
+          freshnessPolicy: { refresh: Boolean(input.refresh), cacheOnly: Boolean(input.cacheOnly), allowStale: Boolean(input.allowStale), ttlMs: null },
+          context: { cache: { status: "fresh", fetchedAt: "2026-07-02T00:00:00.000Z", stale: startCount === 1 }, sections: [] },
+          objectives: { active: [objective], counts: { objective: 1 } },
+          serverStatus: { online: true },
+          providerStatus: { llm: { configured: true, provider: "litellm", model: "codex-test" } },
+          warnings: [],
+          followUpTools: { startup: ["skyagent_start"] },
+        };
+      },
+      streamLlmChat: async function* (input) {
+        expect(input.messages.at(-1)?.content).toBe("what next?");
+        yield { type: "start", provider: "litellm", model: "codex-test" };
+        yield { type: "text_delta", text: "Do dailies." };
+        yield { type: "done", finishReason: "stop" };
+      },
+      listObjectiveItems: () => ({ items: [objective], count: 1 }),
+      objectiveContextSummary: () => ({ active: [objective], counts: { objective: objective.status === "done" ? 0 : 1 } }),
+      createObjectiveItem: (input) => ({ ...objective, ...input }),
+      updateObjectiveItem: (id, patch) => ({ ...objective, id, ...patch }),
+      completeObjectiveItem: (id) => {
+        objective = { ...objective, id, status: "done" };
+        return objective;
+      },
+    }) as any,
+  });
+
+  const started = await gateway.handle(request("/agent/start", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ player: "Notch", profile: "Apple", cacheOnly: true }),
+  })).then((response) => response.json());
+  expect(started.agent).toMatchObject({
+    running: true,
+    ready: true,
+    player: { username: "Notch" },
+    selectedProfile: { cuteName: "Apple" },
+  });
+
+  const message = await gateway.handle(request("/agent/message", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ message: "what next?", stream: false }),
+  })).then((response) => response.json());
+  expect(message.text).toBe("Do dailies.");
+  expect(startCount).toBe(2);
+  expect(message.agent.history.map((entry: any) => entry.role)).toEqual(["user", "assistant"]);
+
+  const stream = await gateway.handle(request("/agent/message", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ message: "what next?" }),
+  }));
+  expect(stream.headers.get("content-type")).toContain("text/event-stream");
+  const chunk = await stream.body!.getReader().read();
+  expect(new TextDecoder().decode(chunk.value)).toContain("agent_start");
+
+  const listed = await gateway.handle(request("/agent/objectives", "test-token")).then((response) => response.json());
+  expect(listed.objectives.count).toBe(1);
+
+  const completed = await gateway.handle(request("/agent/objectives", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ action: "complete", id: "obj-1" }),
+  })).then((response) => response.json());
+  expect(completed.objective.status).toBe("done");
+
+  const status = await gateway.handle(request("/agent/status", "test-token")).then((response) => response.json());
+  expect(status.agent.objectives.counts.objective).toBe(0);
+
+  const stopped = await gateway.handle(request("/agent/stop", "test-token", { method: "POST" })).then((response) => response.json());
+  expect(stopped.agent).toMatchObject({ running: false, ready: false });
+});
+
+test("persistent agent runtime restores session state across gateway runtime instances", async () => {
+  const previousHome = process.env.SKYAGENT_HOME;
+  const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-agent-persist-test-"));
+  process.env.SKYAGENT_HOME = tempHome;
+  try {
+    const deps = {
+      startSkyAgentSession: async () => ({
+        kind: "skyagent.startup",
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        player: { username: "Notch" },
+        selectedProfile: { profileId: "profile-1", cuteName: "Apple" },
+        context: { cache: { status: "fresh", stale: false }, sections: [] },
+        objectives: { active: [], counts: { objective: 0 } },
+        providerStatus: {
+          llm: {
+            configured: true,
+            provider: "litellm",
+            model: "codex-test",
+            apiKey: "sk-session-secret",
+            auth: { token: "session-token-secret" },
+          },
+        },
+        warnings: [{ message: "Authorization: Bearer sk-session-secret" }],
+      }),
+      streamLlmChat: async function* () {
+        yield { type: "text_delta", text: "Persisted answer." };
+      },
+      listObjectiveItems: () => ({ items: [], count: 0 }),
+      objectiveContextSummary: () => ({ active: [], counts: { objective: 0 } }),
+    } as any;
+
+    const sessionPath = path.join(tempHome, "agent-session.json");
+    const firstGateway = createGateway({ token: "test-token", deps, agentSessionPath: sessionPath });
+    await firstGateway.handle(request("/agent/start", "test-token", { method: "POST", body: JSON.stringify({ cacheOnly: true }) }));
+    await firstGateway.handle(request("/agent/message", "test-token", {
+      method: "POST",
+      body: JSON.stringify({ message: "remember this", stream: false }),
+    }));
+
+    const persistedSession = fs.readFileSync(sessionPath, "utf8");
+    expect(persistedSession).not.toContain("sk-session-secret");
+    expect(persistedSession).not.toContain("session-token-secret");
+    expect(persistedSession).toContain("redacted");
+
+    const restoredGateway = createGateway({ token: "test-token", deps, agentSessionPath: sessionPath });
+    const restored = await restoredGateway.handle(request("/agent/status", "test-token")).then((response) => response.json());
+
+    expect(restored.agent).toMatchObject({ running: true, ready: true, player: { username: "Notch" } });
+    expect(restored.agent.history.map((entry: any) => entry.role)).toEqual(["user", "assistant"]);
+    expect(restored.agent.history.at(-1).content).toBe("Persisted answer.");
+  } finally {
+    if (previousHome === undefined) {
+      delete process.env.SKYAGENT_HOME;
+    } else {
+      process.env.SKYAGENT_HOME = previousHome;
+    }
+    fs.rmSync(tempHome, { recursive: true, force: true });
+  }
+});
+
+test("persistent agent start refreshes a restored stale session before reporting ready", async () => {
+  const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-agent-stale-test-"));
+  try {
+    let starts = 0;
+    const deps = {
+      startSkyAgentSession: async (input: any) => {
+        starts += 1;
+        const stale = starts === 1;
+        return {
+          kind: "skyagent.startup",
+          generatedAt: stale ? "2026-07-01T00:00:00.000Z" : "2026-07-02T00:00:00.000Z",
+          player: { username: "Notch" },
+          selectedProfile: { profileId: "profile-1", cuteName: "Apple" },
+          freshnessPolicy: {
+            refresh: Boolean(input.refresh),
+            cacheOnly: Boolean(input.cacheOnly),
+            allowStale: Boolean(input.allowStale),
+            ttlMs: null,
+          },
+          context: { cache: { status: stale ? "stale" : "fresh", stale }, sections: [] },
+          objectives: { active: [], counts: { objective: 0 } },
+          providerStatus: { profile: { status: stale ? "stale" : "fresh" } },
+          warnings: [],
+        };
+      },
+      streamLlmChat: async function* () {},
+      listObjectiveItems: () => ({ items: [], count: 0 }),
+      objectiveContextSummary: () => ({ active: [], counts: { objective: 0 } }),
+    } as any;
+
+    const sessionPath = path.join(tempHome, "agent-session.json");
+    const firstGateway = createGateway({ token: "test-token", deps, agentSessionPath: sessionPath });
+    await firstGateway.handle(request("/agent/start", "test-token", {
+      method: "POST",
+      body: JSON.stringify({ cacheOnly: true, allowStale: true }),
+    }));
+
+    const restoredGateway = createGateway({ token: "test-token", deps, agentSessionPath: sessionPath });
+    const refreshed = await restoredGateway.handle(request("/agent/start", "test-token", {
+      method: "POST",
+      body: JSON.stringify({}),
+    })).then((response) => response.json());
+
+    expect(starts).toBe(2);
+    expect(refreshed.agent.freshness).toMatchObject({ status: "fresh", stale: false });
+  } finally {
+    fs.rmSync(tempHome, { recursive: true, force: true });
+  }
+});
+
+test("persistent agent start refreshes when requested player or profile changes", async () => {
+  const starts: Array<{ player?: string; profile?: string }> = [];
+  const gateway = createGateway({
+    token: "test-token",
+    agentSessionPath: null,
+    deps: ({
+      startSkyAgentSession: async (input) => {
+        starts.push({ player: input.player, profile: input.profile });
+        return {
+          kind: "skyagent.startup",
+          generatedAt: "2026-07-02T00:00:00.000Z",
+          player: { input: input.player, username: input.player ?? "Notch" },
+          selectedProfile: { profileId: input.profile ?? "profile-1", cuteName: input.profile ?? "Apple" },
+          context: { cache: { status: "fresh", stale: false }, sections: [] },
+          objectives: { active: [], counts: { objective: 0 } },
+          providerStatus: { llm: { configured: true, provider: "litellm", model: "codex-test" } },
+          warnings: [],
+        };
+      },
+      streamLlmChat: async function* () {},
+      listObjectiveItems: () => ({ items: [], count: 0 }),
+      objectiveContextSummary: () => ({ active: [], counts: { objective: 0 } }),
+    }) as any,
+  });
+
+  const first = await gateway.handle(request("/agent/start", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ player: "Notch", profile: "Apple", cacheOnly: true }),
+  })).then((response) => response.json());
+  expect(first.agent).toMatchObject({ player: { username: "Notch" }, selectedProfile: { cuteName: "Apple" } });
+
+  await gateway.handle(request("/agent/start", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ player: "notch", profile: "apple", cacheOnly: true }),
+  }));
+  expect(starts).toHaveLength(1);
+
+  const second = await gateway.handle(request("/agent/start", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ player: "Steve", profile: "Banana", cacheOnly: true }),
+  })).then((response) => response.json());
+  expect(second.agent).toMatchObject({ player: { username: "Steve" }, selectedProfile: { cuteName: "Banana" } });
+  expect(starts).toEqual([
+    { player: "Notch", profile: "Apple" },
+    { player: "Steve", profile: "Banana" },
+  ]);
+});
+
+test("persistent agent executes streamed objective tool calls through server path", async () => {
+  let created: any = null;
+  const requests: any[] = [];
+  const gateway = createGateway({
+    token: "test-token",
+    agentSessionPath: null,
+    deps: ({
+      startSkyAgentSession: async () => ({
+        kind: "skyagent.startup",
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        player: { username: "Notch" },
+        selectedProfile: { profileId: "profile-1", cuteName: "Apple" },
+        context: { cache: { status: "fresh", stale: false }, sections: [] },
+        objectives: { active: [], counts: { objective: 0 } },
+        providerStatus: { llm: { configured: true, provider: "litellm", model: "codex-test" } },
+        warnings: [],
+      }),
+      streamLlmChat: async function* (input) {
+        requests.push(input);
+        if (requests.length === 1) {
+          expect(input.tools?.map((tool: any) => tool.function.name)).toContain("skyagent_objective_create");
+          yield { type: "tool_call_delta", toolCalls: [{ index: 0, id: "call_1", function: { name: "skyagent_objective_create", arguments: "{\"itemKind\":\"objective\"," } }] };
+          yield { type: "tool_call_delta", toolCalls: [{ index: 0, function: { arguments: "\"title\":\"Buy Juju\"}" } }] };
+          yield { type: "done", finishReason: "tool_calls" };
+          return;
+        }
+        expect(input.toolChoice).toBe("none");
+        expect(input.messages).toContainEqual(expect.objectContaining({ role: "tool", tool_call_id: "call_1" }));
+        yield { type: "text_delta", text: "Tracked Buy Juju." };
+        yield { type: "done", finishReason: "stop" };
+      },
+      createObjectiveItem: (input) => {
+        created = { id: "obj-1", status: "open", ...input };
+        return created;
+      },
+      listObjectiveItems: () => ({ items: created ? [created] : [], count: created ? 1 : 0 }),
+      objectiveContextSummary: () => ({ active: created ? [created] : [], counts: { objective: created ? 1 : 0 } }),
+      updateObjectiveItem: (id, patch) => ({ ...created, id, ...patch }),
+      completeObjectiveItem: (id) => ({ ...created, id, status: "done" }),
+    }) as any,
+  });
+
+  await gateway.handle(request("/agent/start", "test-token", { method: "POST", body: JSON.stringify({ cacheOnly: true }) }));
+  const response = await gateway.handle(request("/agent/message", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ message: "track juju", stream: false }),
+  })).then((body) => body.json());
+
+  expect(created).toMatchObject({ itemKind: "objective", title: "Buy Juju" });
+  expect(requests).toHaveLength(2);
+  expect(response.events).toContainEqual(expect.objectContaining({ type: "tool_result", name: "skyagent_objective_create" }));
+  expect(response.agent.objectives.counts.objective).toBe(1);
+  expect(response.text).toContain("Tracked Buy Juju");
+});
+
+test("persistent agent returns objective tool errors without aborting chat", async () => {
+  const requests: any[] = [];
+  const gateway = createGateway({
+    token: "test-token",
+    agentSessionPath: null,
+    deps: ({
+      startSkyAgentSession: async () => ({
+        kind: "skyagent.startup",
+        generatedAt: "2026-07-02T00:00:00.000Z",
+        player: { username: "Notch" },
+        selectedProfile: { profileId: "profile-1", cuteName: "Apple" },
+        context: { cache: { status: "fresh", stale: false }, sections: [] },
+        objectives: { active: [], counts: { objective: 0 } },
+        providerStatus: { llm: { configured: true, provider: "litellm", model: "codex-test" } },
+        warnings: [],
+      }),
+      streamLlmChat: async function* (input) {
+        requests.push(input);
+        if (requests.length === 1) {
+          yield { type: "tool_call_delta", toolCalls: [{ index: 0, id: "call_bad", function: { name: "skyagent_objective_complete", arguments: "{}" } }] };
+          yield { type: "done", finishReason: "tool_calls" };
+          return;
+        }
+        expect(input.messages).toContainEqual(expect.objectContaining({ role: "tool", tool_call_id: "call_bad" }));
+        yield { type: "text_delta", text: "I could not complete that objective because the id was missing." };
+        yield { type: "done", finishReason: "stop" };
+      },
+      listObjectiveItems: () => ({ items: [], count: 0 }),
+      objectiveContextSummary: () => ({ active: [], counts: { objective: 0 } }),
+      completeObjectiveItem: () => {
+        throw new Error("should not be called without id");
+      },
+    }) as any,
+  });
+
+  await gateway.handle(request("/agent/start", "test-token", { method: "POST", body: JSON.stringify({ cacheOnly: true }) }));
+  const response = await gateway.handle(request("/agent/message", "test-token", {
+    method: "POST",
+    body: JSON.stringify({ message: "complete it", stream: false }),
+  })).then((body) => body.json());
+
+  expect(response.events).toContainEqual(expect.objectContaining({
+    type: "tool_result",
+    id: "call_bad",
+    name: "skyagent_objective_complete",
+    result: expect.objectContaining({ ok: false, error: "skyagent_objective_complete requires id." }),
+  }));
+  expect(response.text).toContain("id was missing");
+  expect(response.agent.history.at(-1)).toMatchObject({ role: "assistant" });
+});
+
 test("analysis routes mirror core contracts and preserve warnings", async () => {
   const warnings = ["inventory_api_disabled"];
   const gateway = createGateway({
@@ -434,6 +798,14 @@ test("gateway client exposes analysis route helpers", async () => {
   await client.llmProviderStatus();
   await client.llmProviderConfig();
   await client.setLlmProviderConfig({ provider: "litellm" });
+  await client.startAgent({ cacheOnly: true });
+  await client.agentStatus();
+  await client.stopAgent();
+  await client.agentHistory();
+  await client.refreshAgentContext({ allowStale: true });
+  await client.agentObjectives({ kind: "objective" });
+  await client.agentObjectives({ action: "create", title: "Buy item" });
+  await client.messageAgent({ message: "hello" });
   await client.resource("items");
 
   expect(paths).toContain("/inventory-section?section=armor&player=Notch&profile=Apple");
@@ -446,6 +818,14 @@ test("gateway client exposes analysis route helpers", async () => {
   expect(paths).toContain("/provider-status");
   expect(paths).toContain("/llm-provider/status");
   expect(paths).toContain("/llm-provider/config");
+  expect(paths).toContain("/agent/start");
+  expect(paths).toContain("/agent/status");
+  expect(paths).toContain("/agent/stop");
+  expect(paths).toContain("/agent/history");
+  expect(paths).toContain("/agent/context/refresh");
+  expect(paths).toContain("/agent/objectives?kind=objective");
+  expect(paths).toContain("/agent/objectives");
+  expect(paths).toContain("/agent/message");
   expect(paths).toContain("/resource?kind=items");
 });
 
@@ -468,6 +848,10 @@ test("started gateway shuts down through authenticated local endpoint when expli
   expect(await client.shutdown()).toEqual({ ok: true, shuttingDown: true });
 });
 
+test("started gateway rejects non-loopback host binds", () => {
+  expect(() => startGateway({ token: "test-token", host: "0.0.0.0", port: 0 })).toThrow("127.0.0.1");
+});
+
 test("gateway bin requires explicit token for standalone starts", async () => {
   const proc = Bun.spawn(["bun", "./packages/gateway/src/bin.ts"], {
     cwd: path.resolve(import.meta.dir, "../../.."),
@@ -479,4 +863,72 @@ test("gateway bin requires explicit token for standalone starts", async () => {
 
   expect(exitCode).toBe(1);
   expect(stderr).toContain("requires --token");
+});
+
+test("gateway bin rejects public host binds", async () => {
+  const proc = Bun.spawn(["bun", "./packages/gateway/src/bin.ts", "--host=0.0.0.0", "--token=test-token"], {
+    cwd: path.resolve(import.meta.dir, "../../.."),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const stderr = await new Response(proc.stderr).text();
+  const exitCode = await proc.exited;
+
+  expect(exitCode).toBe(1);
+  expect(stderr).toContain("127.0.0.1");
+});
+
+test("root __gateway launcher passes clean args to gateway bin", async () => {
+  const port = await freePort();
+  const token = "test-token";
+  const proc = Bun.spawn(["bun", "./scripts/skyagent.ts", "__gateway", "--host=127.0.0.1", `--port=${port}`, `--token=${token}`], {
+    cwd: path.resolve(import.meta.dir, "../../.."),
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: "ignore",
+  });
+  const client = new GatewayClient({ baseUrl: `http://127.0.0.1:${port}`, token });
+  try {
+    const reader = proc.stdout.getReader();
+    const chunk = await reader.read();
+    reader.releaseLock();
+    const status = JSON.parse(new TextDecoder().decode(chunk.value));
+
+    expect(status).toMatchObject({ host: "127.0.0.1", port });
+    expect(await client.version()).toMatchObject({ ok: true });
+    expect(await client.shutdown()).toEqual({ ok: true, shuttingDown: true });
+    expect(await proc.exited).toBe(0);
+  } finally {
+    if (!proc.killed) {
+      proc.kill();
+    }
+  }
+});
+
+test("root internal gateway launcher supports packaged spawn contract", async () => {
+  const port = await freePort();
+  const token = "test-token";
+  const proc = Bun.spawn(["bun", "./scripts/skyagent.ts", "--host=127.0.0.1", `--port=${port}`, `--token=${token}`], {
+    cwd: path.resolve(import.meta.dir, "../../.."),
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: "ignore",
+    env: { ...process.env, SKYAGENT_INTERNAL_GATEWAY: "1" },
+  });
+  const client = new GatewayClient({ baseUrl: `http://127.0.0.1:${port}`, token });
+  try {
+    const reader = proc.stdout.getReader();
+    const chunk = await reader.read();
+    reader.releaseLock();
+    const status = JSON.parse(new TextDecoder().decode(chunk.value));
+
+    expect(status).toMatchObject({ host: "127.0.0.1", port });
+    expect(await client.version()).toMatchObject({ ok: true });
+    expect(await client.shutdown()).toEqual({ ok: true, shuttingDown: true });
+    expect(await proc.exited).toBe(0);
+  } finally {
+    if (!proc.killed) {
+      proc.kill();
+    }
+  }
 });

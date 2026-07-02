@@ -117,11 +117,71 @@ function parsePort(args: string[]) {
   if (index !== -1) {
     return Number(args[index + 1]);
   }
-  return 18472;
+  return Number(process.env.SKYAGENT_GATEWAY_PORT ?? 18472);
 }
 
 function gatewayScriptPath() {
-  return fileURLToPath(import.meta.resolve("@skyagent/gateway/bin"));
+  if (process.env.SKYAGENT_FORCE_GATEWAY_FALLBACK === "1") {
+    return null;
+  }
+  try {
+    return fileURLToPath(import.meta.resolve("@skyagent/gateway/bin"));
+  } catch {
+    return null;
+  }
+}
+
+function isBunRuntime(executablePath: string | undefined) {
+  if (!executablePath) {
+    return false;
+  }
+  const name = path.basename(executablePath).toLowerCase();
+  return name === "bun" || name === "bun.exe";
+}
+
+function skyAgentEntrypointCommand() {
+  const explicit = process.env.SKYAGENT_EXECUTABLE_PATH;
+  if (explicit) {
+    return [explicit];
+  }
+
+  const execPath = process.execPath;
+  if (execPath && fs.existsSync(execPath) && !isBunRuntime(execPath)) {
+    return [execPath];
+  }
+
+  const main = typeof Bun.main === "string" ? Bun.main : null;
+  if (main && fs.existsSync(main) && !isBunRuntime(main)) {
+    return [main];
+  }
+
+  const argv0 = process.argv[0];
+  const argv1 = process.argv[1];
+  if (argv1 && fs.existsSync(argv1) && isBunRuntime(argv0)) {
+    return [argv0, argv1];
+  }
+  if (argv0 && fs.existsSync(argv0) && !isBunRuntime(argv0)) {
+    return [argv0];
+  }
+
+  throw new Error("Unable to resolve the SkyAgent executable for gateway startup.");
+}
+
+function packagedSkyAgentEntrypointCommand() {
+  const execPath = process.execPath;
+  return execPath && fs.existsSync(execPath) && !isBunRuntime(execPath) ? [execPath] : null;
+}
+
+function gatewaySpawnCommand(host: string, port: number, tokenPath: string) {
+  const args = [`--host=${host}`, `--port=${port}`, `--token-file=${tokenPath}`];
+  const packagedCommand = packagedSkyAgentEntrypointCommand();
+  if (packagedCommand) {
+    return { command: [...packagedCommand, ...args], env: { ...process.env, SKYAGENT_INTERNAL_GATEWAY: "1" } };
+  }
+  const scriptPath = gatewayScriptPath();
+  return scriptPath
+    ? { command: ["bun", scriptPath, ...args], env: process.env }
+    : { command: [...skyAgentEntrypointCommand(), ...args], env: { ...process.env, SKYAGENT_INTERNAL_GATEWAY: "1" } };
 }
 
 async function sleep(ms: number) {
@@ -189,15 +249,17 @@ export async function startGatewayProcess(args: string[] = []) {
   const tokenPath = gatewayTokenPath();
   fs.writeFileSync(tokenPath, `${token}\n`, { encoding: "utf8", mode: 0o600 });
   fs.chmodSync(tokenPath, 0o600);
-  fs.writeFileSync(logPath, "", { encoding: "utf8", flag: "a" });
-  const logFile = Bun.file(logPath);
-  const proc = Bun.spawn(["bun", gatewayScriptPath(), `--host=${host}`, `--port=${port}`, `--token-file=${tokenPath}`], {
+  const logFd = fs.openSync(logPath, "a");
+  const spawn = gatewaySpawnCommand(host, port, tokenPath);
+  const proc = Bun.spawn(spawn.command, {
     cwd: process.cwd(),
-    stdout: logFile,
-    stderr: logFile,
+    stdout: logFd,
+    stderr: logFd,
     stdin: "ignore",
     detached: true,
+    env: spawn.env,
   } as Parameters<typeof Bun.spawn>[1] & { detached: boolean });
+  fs.closeSync(logFd);
   (proc as unknown as { unref?: () => void }).unref?.();
 
   const runtime: GatewayRuntime = {

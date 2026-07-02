@@ -15,11 +15,13 @@ afterEach(async () => {
     tempHome = null;
   }
   delete process.env.SKYAGENT_HOME;
+  delete process.env.SKYAGENT_GATEWAY_PORT;
 });
 
 function isolatedSkyAgentHome() {
   tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-gateway-cli-test-"));
   process.env.SKYAGENT_HOME = tempHome;
+  process.env.SKYAGENT_GATEWAY_PORT = String(20_000 + Math.floor(Math.random() * 20_000));
 }
 
 async function freePort() {
@@ -184,6 +186,16 @@ test("root command delegates gateway status without touching direct commands", a
 
   await command(["gateway", "status"]);
   await expect(command(["plan", "f7", "--budget", "-1"])).rejects.toThrow("Usage: skyagent plan");
+});
+
+test("root start command bootstraps persistent agent through managed gateway", async () => {
+  isolatedSkyAgentHome();
+  process.env.SKYAGENT_GATEWAY_PORT = String(await freePort());
+
+  await command(["start", "--json", "--cache-only", "--allow-stale"]);
+
+  const status = await gatewayStatus();
+  expect(status).toMatchObject({ running: true });
 });
 
 test("root gateway start command exits while managed gateway keeps running", async () => {

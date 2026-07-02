@@ -20,9 +20,9 @@ import { compactProfileOverview, fetchProfileContext, profileSummaries, skycrypt
 import { readinessForPlayer } from "@skyagent/core/readiness";
 import { profileSectionForPlayer, progressionForPlayer } from "@skyagent/core/sections";
 import { runSetup, setupStatus } from "@skyagent/core/setup";
-import { startSkyAgentSession } from "@skyagent/core/start";
 import { weightForPlayer } from "@skyagent/core/weight";
-import { gatewayCommand } from "./gateway.ts";
+import { runTui, tuiSnapshot } from "@skyagent/tui";
+import { gatewayClient, gatewayCommand } from "./gateway.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "./update.ts";
 import { webCommand } from "./web.ts";
 
@@ -51,7 +51,7 @@ Usage:
   skyagent provider config set <provider|base-url|model|api-key|timeout-ms|max-retries|rate-limit-rpm|rate-limit-tpm|budget-usd|budget-window> <value> [--json]
   skyagent version [--json]
   skyagent doctor [--json]
-  skyagent start [nameOrUuid] [profileIdOrName] [--json] [--refresh|--cache-only] [--allow-stale] [--ttl-ms <ms>]
+  skyagent start [nameOrUuid] [profileIdOrName] [--json] [--refresh|--cache-only] [--allow-stale] [--ttl-ms <ms>]  # starts/reuses local gateway and persistent agent
   skyagent context [nameOrUuid] [profileIdOrName] [--cache-only] [--allow-stale] [--ttl-ms <ms>]  # cached read
   skyagent context refresh [nameOrUuid] [profileIdOrName] [--ttl-ms <ms>]
   skyagent context watch [--since <sequence>] [--limit <n>] [--once]
@@ -109,6 +109,7 @@ Usage:
   skyagent gateway restart [--json]
   skyagent gateway status [--json]
   skyagent gateway logs [--json]
+  skyagent tui [--smoke]
   skyagent web start [--no-open] [--json]
   skyagent web stop [--json]
   skyagent web restart [--no-open] [--json]
@@ -660,7 +661,8 @@ export async function command(args) {
 
   if (area === "start") {
     const parsed = parseStartArgs([action, ...rest].filter(Boolean));
-    output(await startSkyAgentSession({
+    const gateway = await gatewayClient();
+    const response = await gateway.client.startAgent({
       player: parsed.values[0],
       profile: parsed.values[1],
       refresh: parsed.refresh,
@@ -668,8 +670,9 @@ export async function command(args) {
       allowStale: parsed.allowStale,
       ttlMs: parsed.ttlMs,
       sourceKind: "cli",
-      sourceTransport: "command",
-    }));
+      sourceTransport: "gateway-command",
+    });
+    output({ ...response, gateway: gateway.status });
     return;
   }
 
@@ -748,6 +751,15 @@ export async function command(args) {
 
   if (area === "gateway") {
     output(await gatewayCommand(action, rest), true);
+    return;
+  }
+
+  if (area === "tui") {
+    if (action === "--smoke" || rest.includes("--smoke")) {
+      output(tuiSnapshot(), true);
+      return;
+    }
+    await runTui([action, ...rest].filter(Boolean));
     return;
   }
 

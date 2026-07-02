@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dir, "..");
+const packageVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version ?? "0.0.0";
 const runtimeNodeModulesDir = path.join(repoRoot, ".codex-plugin", "runtime", "modules", "node_modules");
 const rootNodeModulesDir = path.join(repoRoot, "node_modules");
 const require = createRequire(import.meta.url);
@@ -34,7 +35,7 @@ function writeSkyAgentPackageShim(packageName: "@skyagent/core" | "@skyagent/mcp
 
   fs.writeFileSync(path.join(targetDir, "package.json"), `${JSON.stringify({
     name: packageName,
-    version: "0.1.0",
+    version: packageVersion,
     type: "module",
     private: true,
     exports,
