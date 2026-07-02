@@ -10,6 +10,7 @@ PR_TITLE="${PR_TITLE:-}"
 PR_BODY="${PR_BODY:-}"
 CODEX_REVIEW_MODEL="${CODEX_REVIEW_MODEL:-gpt-5.5}"
 CODEX_REVIEW_EFFORT="${CODEX_REVIEW_EFFORT:-low}"
+MAX_PROMPT_BYTES="${MAX_PROMPT_BYTES:-700000}"
 
 write_blocked_review() {
   local summary="$1"
@@ -23,6 +24,20 @@ fs.writeFileSync(process.env.REVIEW_OUTPUT, `${JSON.stringify({
   non_blocking_notes: [],
 }, null, 2)}\n`);
 NODE
+}
+
+append_capped_file() {
+  local file_path="$1"
+  local label="$2"
+  local max_bytes="$3"
+  local byte_count
+  byte_count="$(wc -c < "${file_path}" | tr -d '[:space:]')"
+  if [ "${byte_count}" -gt "${max_bytes}" ]; then
+    head -c "${max_bytes}" "${file_path}"
+    printf '\n\n[%s truncated from %s to %s bytes for Codex review input limits]\n' "${label}" "${byte_count}" "${max_bytes}"
+  else
+    cat "${file_path}"
+  fi
 }
 
 if [ ! -s "${CODEX_HOME}/auth.json" ]; then
@@ -52,14 +67,23 @@ fi
 
 DIFF_FILE="$(mktemp)"
 PROMPT_FILE="$(mktemp)"
-git diff --stat "${BASE_REF}...HEAD" -- . ':!packages/web/dist/**' > "${DIFF_FILE}"
+PR_BODY_FILE="$(mktemp)"
+printf '%s\n' "${PR_BODY}" > "${PR_BODY_FILE}"
+DIFF_EXCLUDES=(
+  ':!packages/web/dist/**'
+  ':!.codex-plugin/runtime/modules/**'
+)
+git diff --stat "${BASE_REF}...HEAD" -- . "${DIFF_EXCLUDES[@]}" > "${DIFF_FILE}"
 printf '\n--- FULL DIFF ---\n' >> "${DIFF_FILE}"
-git diff --find-renames "${BASE_REF}...HEAD" -- . ':!packages/web/dist/**' >> "${DIFF_FILE}"
+git diff --find-renames "${BASE_REF}...HEAD" -- . "${DIFF_EXCLUDES[@]}" >> "${DIFF_FILE}"
 
-cat > "${PROMPT_FILE}" <<EOF
+{
+cat <<EOF
 You are reviewing a pull request for the SkyAgent repository.
 
 Review the PR against the linked issue/spec, the repository rules in .agents/AGENTS.md, and the diff below.
+
+The generated review diff intentionally excludes packages/web/dist/** and .codex-plugin/runtime/modules/**. Review the generator and validation logic for those generated files instead; CI must validate generated payloads directly.
 
 Return only JSON that matches the provided schema.
 
@@ -74,16 +98,44 @@ PR title:
 ${PR_TITLE}
 
 PR body:
-${PR_BODY}
+EOF
+
+append_capped_file "${PR_BODY_FILE}" "PR body" 40000
+
+cat <<EOF
 
 Repository rules from .agents/AGENTS.md:
-$(cat "${AGENTS_CONTEXT}")
+EOF
+
+append_capped_file "${AGENTS_CONTEXT}" ".agents/AGENTS.md" 120000
+
+cat <<EOF
 
 Linked issue/spec context:
-$(cat "${ISSUE_CONTEXT}")
-
-$(cat "${DIFF_FILE}")
 EOF
+
+append_capped_file "${ISSUE_CONTEXT}" "linked issue context" 220000
+
+cat <<EOF
+
+EOF
+
+append_capped_file "${DIFF_FILE}" "PR diff" 520000
+} > "${PROMPT_FILE}"
+
+PROMPT_BYTES="$(wc -c < "${PROMPT_FILE}" | tr -d '[:space:]')"
+if [ "${PROMPT_BYTES}" -gt "${MAX_PROMPT_BYTES}" ]; then
+  TRUNCATED_PROMPT_FILE="$(mktemp)"
+  TRUNCATION_MARKER="$(printf '\n\n[Codex review prompt truncated from %s to %s bytes for input limits]\n' "${PROMPT_BYTES}" "${MAX_PROMPT_BYTES}")"
+  MARKER_BYTES="$(printf '%s' "${TRUNCATION_MARKER}" | wc -c | tr -d '[:space:]')"
+  HEAD_BYTES="$((MAX_PROMPT_BYTES - MARKER_BYTES))"
+  if [ "${HEAD_BYTES}" -lt 1 ]; then
+    HEAD_BYTES=1
+  fi
+  head -c "${HEAD_BYTES}" "${PROMPT_FILE}" > "${TRUNCATED_PROMPT_FILE}"
+  printf '%s' "${TRUNCATION_MARKER}" >> "${TRUNCATED_PROMPT_FILE}"
+  mv "${TRUNCATED_PROMPT_FILE}" "${PROMPT_FILE}"
+fi
 
 if ! codex exec \
   --cd /workspace \
