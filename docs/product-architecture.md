@@ -258,6 +258,8 @@ Minecraft mod telemetry is reserved as a future producer through provenance meta
 
 The broad `$hypixel-skyblock` skill should route session-scale analysis through `$skyagent-context-engine` first, then `$skyagent-objectives` and `$skyagent-live-progress` when durable work items or recent events may change the answer. Narrow skills should keep their domain-specific tools, but reference the context, objective, and event-stream skills when profile cache, todo/buy/source/snipe state, or live progress changes matter.
 
+The transcript-derived behavior contract lives in `docs/agent-behavior.md` and `packages/core/src/behavior-playbook.ts`. It requires compact startup context before broad analysis, fallback from MCP to CLI before claiming a missing capability, bounded raw extraction only when summaries are unavailable, Museum-specific extraction before generic progression, and complete gear/pet/accessory/freshness checks before damage or Slayer purchases.
+
 Skill additions and behavior changes require `bun run validate:skill` and a plugin manifest cachebuster bump so local Codex plugin installs can reload the updated skillset.
 
 ## TUI And Web

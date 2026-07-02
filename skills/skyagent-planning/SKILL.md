@@ -22,6 +22,8 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 - Route context/session bootstrap to `$skyagent-context-engine`, durable plan tracking to `$skyagent-objectives`, and recent progress/event-stream checks to `$skyagent-live-progress`.
 - Pull supporting detail with `skyblock_profile_snapshot`, `skyblock_profile_overview`, `skyblock_progression`, `skyblock_readiness`, `skyblock_networth`, `skyblock_accessories`, `skyblock_price`, or `skyblock_price_history` when the plan output needs profile, economy, progression, readiness, or price context. Prefer the snapshot cache for repeated planning passes and refresh it when current progress matters.
 - Route patch-sensitive gear, money-making, class, boss, or route claims to `$skyagent-provider-maintenance` before making strong recommendations.
+- For Museum goals, inspect `skyblock_profile_section` with `museum`, fall back to `skyblock_museum` or bounded raw extraction, inspect hidden inventory/storage/wardrobe candidates, and price candidates before recommending buys.
+- For damage or Slayer goals, check readiness, armor/equipment/current inventory, wardrobe/storage/museum signals, pets, accessories/Magical Power, budget, prices, and provider freshness before recommending purchases.
 
 ## Rules
 
@@ -34,3 +36,4 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 - When the user accepts a route, persist it as objective/task entries; persist purchase candidates as `buy` entries and auction watch rules as `snipe` entries with `itemId`, `targetPrice`, `budget`, `priority`, source provider, freshness, and warnings. Do not create or update objective records during preview-only planning.
 - Keep profile, economy, progression, readiness, and external meta assumptions visible in the final plan.
 - Re-read recent context events before revising an in-progress objective so the user does not have to restate progress already captured by the context stream.
+- If a needed planner input is unavailable, attempt the narrow fallback tool and report the missing field with its impact instead of producing a generic route.

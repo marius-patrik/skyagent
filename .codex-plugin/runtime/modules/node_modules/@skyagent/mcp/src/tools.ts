@@ -70,7 +70,7 @@ export const tools = [
   },
   {
     name: "skyagent_start",
-    description: "Start a SkyAgent agent session, collect setup/profile/status/objective/provider context, and persist an agent.session_start context event.",
+    description: "Start a SkyAgent agent session and return the compact startup context first: setup, profile, objectives, server/provider status, recent events, follow-up tools, and an agent.session_start event.",
     inputSchema: {
       type: "object",
       properties: {
@@ -309,7 +309,7 @@ export const tools = [
   },
   {
     name: "skyblock_profile_member",
-    description: "Fetch the selected player's member object from a selected SkyBlock profile by profile ID or cute name. Requires API key.",
+    description: "Fetch the selected player's raw member object for bounded fallback extraction when no compact summary or parser exists. Requires API key.",
     inputSchema: {
       type: "object",
       properties: {
@@ -377,7 +377,7 @@ export const tools = [
   },
   {
     name: "skyblock_item_dump",
-    description: "Decode one inventory section and return its extracted item stacks for debugging and downstream normalization. Requires API key.",
+    description: "Decode one inventory section and return extracted item stacks for explicit debug or missing-parser fallback work. Prefer compact/normalized tools first. Requires API key.",
     inputSchema: {
       type: "object",
       properties: {
@@ -479,7 +479,7 @@ export const tools = [
   },
   {
     name: "skyblock_profile_section",
-    description: "Render one structured progression section such as skills, dungeons, slayer, mining, garden, bestiary, collections, minions, museum, crimson_isle, rift, trophy_fishing, pets, essence, currencies, or unlocks. Requires API key.",
+    description: "Render one structured compact profile section. Use museum here before generic progression for Museum goals; fall back to raw museum/member extraction only if missing. Requires API key.",
     inputSchema: {
       type: "object",
       properties: {
@@ -517,7 +517,7 @@ export const tools = [
   },
   {
     name: "skyblock_readiness",
-    description: "Estimate readiness for dungeons, slayer, kuudra, garden, or mining with source fields, assumptions, freshness, and missing-data warnings. Requires API key.",
+    description: "Estimate readiness for dungeons, slayer, kuudra, garden, or mining with source fields, assumptions, freshness, and missing-data warnings; pair Slayer/damage advice with gear, pet, accessory, budget, and provider checks.",
     inputSchema: {
       type: "object",
       properties: {
@@ -531,7 +531,7 @@ export const tools = [
   },
   {
     name: "skyblock_plan_goal",
-    description: "Produce a deterministic, auditable plan for a SkyBlock goal with recommendations, blockers, cost/time estimates, source freshness, and warnings. Requires API key.",
+    description: "Produce a deterministic, auditable plan for a SkyBlock goal with recommendations, blockers, cost/time estimates, source freshness, warnings, and preview objective candidates. Use context first and persist only after user acceptance.",
     inputSchema: {
       type: "object",
       properties: {
@@ -642,7 +642,7 @@ export const tools = [
   },
   {
     name: "skyblock_museum",
-    description: "Fetch SkyBlock museum data by profile ID, or the configured selected profile. Requires API key.",
+    description: "Fetch raw SkyBlock museum data by profile ID, or the configured selected profile, as a fallback for Museum goal extraction when compact museum summaries are insufficient. Requires API key.",
     inputSchema: {
       type: "object",
       properties: { profile: { type: "string" } },

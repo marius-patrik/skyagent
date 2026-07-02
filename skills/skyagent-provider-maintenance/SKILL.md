@@ -22,6 +22,7 @@ Use this skill when currentness, provider quality, stale formulas, parity drift,
 - Use `skyagent_context_events` or `skyagent_context_watch` for `provider.cache_status`, `provider.cache_status_change`, `hypixel.server_status_change`, and recent refresh history.
 - Use `$skyagent-context-engine` when provider status should be carried into broad profile or planning context.
 - Use `$skyagent-live-progress` when the task is mainly about event-stream or status-change monitoring.
+- When server maintenance, provider outage, stale cache, or partial provider data appears, route back with explicit degraded-freshness warnings instead of blocking the whole answer.
 - Check official Hypixel patch notes, official wiki pages, and live Hypixel API resources before community guides for patch-sensitive claims.
 - Check NEU, SkyHelper, CoflNet, SkyCrypt, and Discord-bot parity assumptions as secondary references, not authoritative truth.
 - Route concrete goal plans back to `$skyagent-planning` after verification.
