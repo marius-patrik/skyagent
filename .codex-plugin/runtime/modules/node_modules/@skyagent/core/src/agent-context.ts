@@ -19,6 +19,7 @@ const PARTIAL_WARNING_CODES = new Set([
   "current_loadout_unknown",
   "unsupported_section_shape",
   "inventory_section_error",
+  "corrupt_nbt_payload",
   "nbt_decode_error",
   "invalid_nbt_payload",
   "accessory_price_limit_reached",
@@ -35,6 +36,12 @@ function decodedSectionStatus(section: any) {
     return "missing";
   }
   const codes = warningCodes(section.warnings);
+  if (codes.has("corrupt_nbt_payload")) {
+    return "corrupt";
+  }
+  if (codes.has("unsupported_section_shape")) {
+    return "unsupported";
+  }
   if ([...codes].some((code) => PARTIAL_WARNING_CODES.has(code))) {
     return "partial";
   }
@@ -82,6 +89,9 @@ function sectionSummary(section: any, limit = 8) {
   return {
     status,
     available: Boolean(section?.available),
+    availabilityStatus: section?.available
+      ? (section?.itemCount ?? 0) === 0 ? "present_empty" : "present"
+      : "api_disabled_or_missing",
     itemCount: section?.itemCount ?? 0,
     sourcePath: section?.sourcePath ?? null,
     sourceKind: section?.sourceKind ?? null,
@@ -90,6 +100,11 @@ function sectionSummary(section: any, limit = 8) {
     items: compactItems(section, limit),
     warnings: compactWarnings(section?.warnings ?? [], 8),
   };
+}
+
+function storageSectionSummary(section: any) {
+  const { items: _items, ...summary } = sectionSummary(section, 0);
+  return summary;
 }
 
 function compactPetItems(section: any, limit = 8) {
@@ -233,6 +248,25 @@ function compactAccessories(accessories: any, member?: any) {
   };
 }
 
+function signalStorageSummary(detail: any, label: string) {
+  const status = detail?.available ? detail.status : "api_disabled_or_missing";
+  return {
+    status,
+    label,
+    available: Boolean(detail?.available),
+    availabilityStatus: detail?.status ?? "api_disabled_or_missing",
+    itemCount: null,
+    sourcePath: detail?.sourcePath ?? null,
+    freshness: sectionFreshness(status, "profile", null),
+    items: [],
+    warnings: compactWarnings(detail?.warnings?.length ? detail.warnings : detail?.available ? [] : [{
+      code: "missing_section",
+      message: `${label} data is missing. The player's inventory API may be disabled or the profile payload may be partial.`,
+      sourcePath: detail?.sourcePath ?? null,
+    }], 2),
+  };
+}
+
 function coreProgressionFromSnapshot(snapshot: any) {
   return {
     skyblockLevelXp: snapshot.overview?.progression?.skyblockLevelXp ?? null,
@@ -286,6 +320,66 @@ function cachedSectionSummary(snapshot: any, cached: any, signalKey: string, lab
   };
 }
 
+function cachedStorageSummary(snapshot: any) {
+  const cached = snapshot.agentContextSummary?.storage;
+  if (cached) {
+    return Object.fromEntries(Object.entries(cached).map(([key, value]: [string, any]) => [
+      key,
+      {
+        ...value,
+        status: snapshot.stale && value?.status !== "missing" ? "stale" : value?.status ?? "cached",
+        freshness: sectionFreshness(snapshot.stale ? "stale" : "cached", "profile-snapshot-cache", snapshot),
+        warnings: compactWarnings([
+          ...(value?.warnings ?? []),
+          ...(snapshot.stale ? [{
+            code: "stale_profile_snapshot",
+            message: `${value?.label ?? key} detail came from a stale profile snapshot cache entry.`,
+            sourcePath: "profile-snapshot-cache",
+          }] : []),
+        ], 8),
+      },
+    ]));
+  }
+  return {
+    inventory: cachedSignalSummary(snapshot, "inventory", "hasInventory", "Inventory"),
+    enderChest: cachedSignalSummary(snapshot, "enderChest", "hasEnderChest", "Ender Chest"),
+    backpacks: cachedSignalSummary(snapshot, "backpacks", "hasBackpacks", "Backpacks"),
+    personalVault: cachedSignalSummary(snapshot, "personalVault", "hasPersonalVault", "Personal Vault"),
+    sacks: cachedSignalSummary(snapshot, "sacks", "hasSacks", "Sacks"),
+  };
+}
+
+function cachedSignalSummary(snapshot: any, detailKey: string, signalKey: string, label: string) {
+  const detail = snapshot.overview?.inventoryApiDetails?.[detailKey] ?? null;
+  const cacheStatus = snapshot.stale ? "stale" : cachedStatus(snapshot, null, signalKey);
+  const available = Boolean(detail?.available ?? snapshot.overview?.inventoryApiSignals?.[signalKey]);
+  const status = snapshot.stale ? "stale" : available ? cacheStatus : "api_disabled_or_missing";
+  const sourcePath = detail?.sourcePath ?? `overview.inventoryApiSignals.${signalKey}`;
+  return {
+    status,
+    label,
+    available,
+    availabilityStatus: detail?.status ?? (available ? "present" : "api_disabled_or_missing"),
+    itemCount: null,
+    sourcePath,
+    freshness: sectionFreshness(status, "profile-snapshot-cache", snapshot),
+    warnings: compactWarnings([
+      {
+        code: available ? "cached_detail_limited" : "api_disabled_or_missing",
+        message: available
+          ? `${label} availability was cached, but decoded item detail was not stored in this profile snapshot.`
+          : `${label} API signal was absent when this snapshot was written; the API section may have been disabled or the payload partial.`,
+        sourcePath,
+      },
+      ...(snapshot.stale ? [{
+        code: "stale_profile_snapshot",
+        message: `${label} availability came from a stale profile snapshot cache entry.`,
+        sourcePath: "profile-snapshot-cache",
+      }] : []),
+    ], 8),
+  };
+}
+
 function cachedAccessoriesSummary(snapshot: any) {
   const cached = snapshot.agentContextSummary?.accessories;
   const status = cachedStatus(snapshot, cached, "hasAccessoryBag");
@@ -331,6 +425,68 @@ function cachedAccessoriesSummary(snapshot: any) {
   };
 }
 
+function compactMuseumFromContext(context: any) {
+  const memberId = context.member?.profile_member_id ?? context.uuid;
+  const museumMembers = context.profile?.museum?.members && typeof context.profile.museum.members === "object"
+    ? context.profile.museum.members
+    : null;
+  const memberMuseum = museumMembers?.[memberId] ?? museumMembers?.[context.uuid] ?? context.member?.museum ?? null;
+  const profileMuseum = !museumMembers ? context.profile?.museum ?? null : null;
+  const museum = memberMuseum ?? profileMuseum;
+  const sourcePath = museumMembers?.[memberId] || museumMembers?.[context.uuid]
+    ? "profile.museum.selected_member"
+    : context.member?.museum
+      ? "member.museum"
+      : profileMuseum
+        ? "profile.museum"
+        : null;
+  const status = museum ? "fresh" : "missing";
+  return {
+    status,
+    available: Boolean(museum),
+    sourcePath,
+    memberScoped: sourcePath === "profile.museum.selected_member" || sourcePath === "member.museum",
+    coopMemberMuseumCount: museumMembers ? Object.keys(museumMembers).length : null,
+    itemCount: Object.keys(museum?.items ?? {}).length,
+    specialItemCount: Object.keys(museum?.special ?? {}).length,
+    value: museum?.value ?? null,
+    freshness: sectionFreshness(status, "profile", null),
+    warnings: museum ? [] : compactWarnings([{
+      code: "missing_api_data",
+      message: "Museum data is absent from the selected profile payload.",
+      sourcePath: "profile.museum",
+    }], 1),
+  };
+}
+
+function cachedMuseumSummary(snapshot: any) {
+  const cached = snapshot.agentContextSummary?.museum ?? snapshot.overview?.museum ?? null;
+  const status = cached?.available ? (snapshot.stale ? "stale" : "cached") : "missing";
+  return {
+    status,
+    available: Boolean(cached?.available),
+    sourcePath: cached?.sourcePath ?? "overview.museum",
+    memberScoped: Boolean(cached?.memberScoped),
+    coopMemberMuseumCount: cached?.coopMemberMuseumCount ?? null,
+    itemCount: cached?.itemCount ?? null,
+    specialItemCount: cached?.specialItemCount ?? null,
+    value: cached?.value ?? null,
+    freshness: sectionFreshness(status, "profile-snapshot-cache", snapshot),
+    warnings: compactWarnings([
+      ...(cached?.available ? [] : [{
+        code: "cached_detail_missing",
+        message: "Museum availability was missing when this snapshot was written.",
+        sourcePath: "overview.museum",
+      }]),
+      ...(snapshot.stale ? [{
+        code: "stale_profile_snapshot",
+        message: "Museum availability came from a stale profile snapshot cache entry.",
+        sourcePath: "profile-snapshot-cache",
+      }] : []),
+    ], 8),
+  };
+}
+
 function cachedReadinessSummary(snapshot: any) {
   const cached = snapshot.agentContextSummary?.readiness;
   const freshnessStatus = snapshot.stale ? "stale" : "cached";
@@ -359,6 +515,9 @@ function agentContextSummary(capsule: any) {
     schemaVersion: 1,
     generatedAt: capsule.generatedAt,
     gear: capsule.gear,
+    storage: capsule.storage,
+    museum: capsule.museum,
+    profileCompleteness: capsule.profileCompleteness,
     pets: capsule.pets,
     accessories: capsule.accessories,
     readiness: capsule.readiness,
@@ -409,6 +568,12 @@ function contextSections(parts: Record<string, any>, events: any = null) {
     wardrobe: sectionRecord(parts.gear.wardrobe),
     pets: sectionRecord(parts.pets),
     accessories: sectionRecord(parts.accessories),
+    storage: {
+      status: aggregateSectionStatus(Object.values(parts.storage ?? {}).map((entry: any) => entry.status ?? "unavailable")),
+      sections: Object.fromEntries(Object.entries(parts.storage ?? {}).map(([key, value]: [string, any]) => [key, sectionRecord(value)])),
+      warningCount: Object.values(parts.storage ?? {}).reduce((total: number, entry: any) => total + (entry.warnings ?? []).length, 0),
+    },
+    museum: sectionRecord(parts.museum),
     readiness: {
       status: aggregateSectionStatus(parts.readiness.map((entry: any) => entry.freshnessStatus ?? entry.freshness?.status ?? "unavailable")),
       areas: parts.readiness.map((entry: any) => ({
@@ -484,10 +649,14 @@ export async function buildAgentContext(context: any, options: Record<string, an
     ttlMs,
     fetchedAtMs: now,
   });
-  const [armor, equipment, wardrobe, pets, accessories] = await Promise.all([
+  const [armor, equipment, wardrobe, inventory, enderChest, backpacks, personalVault, pets, accessories] = await Promise.all([
     inventorySectionFromMember(context.member, "armor"),
     inventorySectionFromMember(context.member, "equipment"),
     inventorySectionFromMember(context.member, "wardrobe"),
+    inventorySectionFromMember(context.member, "inventory"),
+    inventorySectionFromMember(context.member, "ender_chest"),
+    inventorySectionFromMember(context.member, "backpacks"),
+    inventorySectionFromMember(context.member, "personal_vault"),
     inventorySectionFromMember(context.member, "pets"),
     (options.accessoriesProvider ?? calculateAccessoriesFromMember)(context.member, {
       budget: null,
@@ -502,6 +671,10 @@ export async function buildAgentContext(context: any, options: Record<string, an
     ...(armor.warnings ?? []),
     ...(equipment.warnings ?? []),
     ...(wardrobe.warnings ?? []),
+    ...(inventory.warnings ?? []),
+    ...(enderChest.warnings ?? []),
+    ...(backpacks.warnings ?? []),
+    ...(personalVault.warnings ?? []),
     ...(pets.warnings ?? []),
     ...(accessories.warnings ?? []),
     ...readiness.flatMap((entry) => entry.warnings ?? []),
@@ -521,6 +694,15 @@ export async function buildAgentContext(context: any, options: Record<string, an
     equipment: sectionSummary(equipment, 4),
     wardrobe: sectionSummary(wardrobe, 8),
   };
+  const storage = {
+    inventory: storageSectionSummary(inventory),
+    enderChest: storageSectionSummary(enderChest),
+    backpacks: storageSectionSummary(backpacks),
+    personalVault: storageSectionSummary(personalVault),
+    sacks: signalStorageSummary(snapshot.overview?.inventoryApiDetails?.sacks, "Sacks"),
+  };
+  const museum = compactMuseumFromContext(context);
+  const profileCompleteness = snapshot.overview?.profileCompleteness ?? {};
   const petsSummary = petSummary(pets, 8);
   const accessoriesSummary = compactAccessories(accessories, context.member);
   const readinessSummary = readiness.map(compactReadiness);
@@ -550,13 +732,17 @@ export async function buildAgentContext(context: any, options: Record<string, an
     economy: snapshot.overview?.economy ?? {},
     coreProgression: coreProgressionFromSnapshot(snapshot),
     inventoryApiSignals: snapshot.overview?.inventoryApiSignals ?? {},
+    inventoryApiDetails: snapshot.overview?.inventoryApiDetails ?? {},
+    profileCompleteness,
+    storage,
+    museum,
     gear,
     pets: petsSummary,
     accessories: accessoriesSummary,
     readiness: readinessSummary,
     objectives,
     providerFreshness,
-    sections: contextSections({ cache, gear, pets: petsSummary, accessories: accessoriesSummary, readiness: readinessSummary, objectives, providerFreshness, providerFreshnessRaw: providers }, options.events),
+    sections: contextSections({ cache, gear, storage, museum, pets: petsSummary, accessories: accessoriesSummary, readiness: readinessSummary, objectives, providerFreshness, providerFreshnessRaw: providers }, options.events),
     warnings,
     followUpTools: followUpTools(),
     rawPayloadsIncluded: false,
@@ -579,9 +765,12 @@ export function buildAgentContextFromSnapshot(snapshot: any, options: Record<str
   };
   const gear = {
     armor: cachedSectionSummary(snapshot, cached.gear?.armor, "hasArmor", "Armor"),
-    equipment: cachedSectionSummary(snapshot, cached.gear?.equipment, "hasInventoryBag", "Equipment"),
+    equipment: cachedSectionSummary(snapshot, cached.gear?.equipment, "hasEquipment", "Equipment"),
     wardrobe: cachedSectionSummary(snapshot, cached.gear?.wardrobe, "hasWardrobe", "Wardrobe"),
   };
+  const storage = cachedStorageSummary(snapshot);
+  const museum = cachedMuseumSummary(snapshot);
+  const profileCompleteness = cached.profileCompleteness ?? snapshot.overview?.profileCompleteness ?? {};
   const pets = cachedSectionSummary(snapshot, cached.pets, "hasPets", "Pet");
   const accessories = cachedAccessoriesSummary(snapshot);
   const readiness = cachedReadinessSummary(snapshot);
@@ -610,13 +799,17 @@ export function buildAgentContextFromSnapshot(snapshot: any, options: Record<str
     economy: snapshot.overview?.economy ?? {},
     coreProgression: coreProgressionFromSnapshot(snapshot),
     inventoryApiSignals: snapshot.overview?.inventoryApiSignals ?? {},
+    inventoryApiDetails: snapshot.overview?.inventoryApiDetails ?? {},
+    profileCompleteness,
+    storage,
+    museum,
     gear,
     pets,
     accessories,
     readiness,
     objectives,
     providerFreshness,
-    sections: contextSections({ cache, gear, pets, accessories, readiness, objectives, providerFreshness, providerFreshnessRaw: providers }, options.events),
+    sections: contextSections({ cache, gear, storage, museum, pets, accessories, readiness, objectives, providerFreshness, providerFreshnessRaw: providers }, options.events),
     warnings: compactWarnings([
       ...(snapshot.warnings ?? []),
       ...(providers.warnings ?? []),

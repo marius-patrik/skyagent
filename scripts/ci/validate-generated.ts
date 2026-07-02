@@ -27,7 +27,7 @@ function listFiles(root: string) {
   return files.sort();
 }
 
-function run(command: string[], env: NodeJS.ProcessEnv = process.env) {
+function runWithOutput(command: string[], env: NodeJS.ProcessEnv = process.env) {
   const proc = Bun.spawnSync(command, {
     cwd: repoRoot,
     stdout: "pipe",
@@ -35,8 +35,13 @@ function run(command: string[], env: NodeJS.ProcessEnv = process.env) {
     env,
   });
   if (proc.exitCode !== 0) {
-    fail(`${command.join(" ")} failed\n${proc.stderr.toString()}`);
+    fail(`${command.join(" ")} failed\n${proc.stdout.toString()}\n${proc.stderr.toString()}`);
   }
+  return proc.stdout.toString();
+}
+
+function run(command: string[], env: NodeJS.ProcessEnv = process.env) {
+  runWithOutput(command, env);
 }
 
 function assertSameGeneratedTree(actualRoot: string, expectedRoot: string, label: string) {
@@ -149,6 +154,65 @@ function assertRuntimePayload() {
     if (payload.version !== packageJson.version) {
       fail(`${relativePath} version ${payload.version} does not match root package version ${packageJson.version}`);
     }
+  }
+  assertRuntimeContextSurface();
+}
+
+function assertRuntimeContextSurface() {
+  const probe = `
+    const mod = await import("./.codex-plugin/runtime/modules/node_modules/@skyagent/core/src/agent-context.ts");
+    const snapshot = {
+      kind: "skyagent.profileSnapshot",
+      schemaVersion: 1,
+      cacheStatus: "hit",
+      stale: true,
+      fetchedAt: "1970-01-01T00:00:01.000Z",
+      ttlMs: 1,
+      player: { username: "GeneratedProbe", uuid: "uuid" },
+      profile: { profileId: "profile", cuteName: "Apple", selected: true, gameMode: "normal" },
+      profiles: [],
+      overview: {
+        economy: {},
+        inventoryApiSignals: {
+          hasInventory: false,
+          hasEnderChest: false,
+          hasBackpacks: false,
+          hasPersonalVault: false,
+          hasSacks: true,
+          hasEquipment: false,
+          hasMuseum: false,
+        },
+        inventoryApiDetails: {
+          inventory: { status: "api_disabled_or_missing", available: false, sourcePath: null, warnings: [{ code: "api_disabled_or_missing", message: "missing" }] },
+          enderChest: { status: "api_disabled_or_missing", available: false, sourcePath: null, warnings: [] },
+          backpacks: { status: "api_disabled_or_missing", available: false, sourcePath: null, warnings: [] },
+          personalVault: { status: "api_disabled_or_missing", available: false, sourcePath: null, warnings: [] },
+          sacks: { status: "present_empty", available: true, sourcePath: "member.inventory.bag_contents.sacks_bag", warnings: [] },
+        },
+        profileCompleteness: {
+          selectedMember: { uuid: "uuid", memberPresent: true },
+          coop: { memberCount: 1 },
+          profileAvailability: { museumAvailable: false },
+        },
+        museum: { status: "missing", available: false, itemCount: 0, specialItemCount: 0, coopMemberMuseumCount: null },
+      },
+      warnings: [],
+    };
+    const capsule = mod.buildAgentContextFromSnapshot(snapshot, {
+      now: 2_000,
+      providers: { generatedAt: "1970-01-01T00:00:02.000Z", providers: [], warnings: [] },
+      objectives: { counts: {}, active: [] },
+    });
+    if (!capsule.profileCompleteness?.selectedMember?.memberPresent) throw new Error("missing profileCompleteness");
+    if (!capsule.storage?.inventory || capsule.storage.inventory.status !== "stale") throw new Error("missing stale storage");
+    if (Object.prototype.hasOwnProperty.call(capsule.storage.inventory, "items")) throw new Error("storage item arrays must be omitted");
+    if (!capsule.storage.sacks || capsule.storage.sacks.availabilityStatus !== "present_empty") throw new Error("missing present-empty sacks");
+    if (!capsule.museum || capsule.museum.available !== false) throw new Error("missing museum signal");
+    console.log(JSON.stringify({ ok: true, storage: capsule.storage.inventory.status, museum: capsule.museum.status }));
+  `;
+  const output = runWithOutput(["bun", "-e", probe]);
+  if (!output.includes('"ok":true')) {
+    fail("prepared runtime context probe did not report ok");
   }
 }
 

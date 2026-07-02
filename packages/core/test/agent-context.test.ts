@@ -36,7 +36,19 @@ function context() {
       selected: true,
       game_mode: "normal",
       banking: { balance: 1000 },
-      members: {},
+      members: {
+        [uuid]: {},
+        coopmate: {},
+      },
+      museum: {
+        members: {
+          [uuid]: {
+            items: { HYPERION: {} },
+            special: { RIFT_PRISM: {} },
+            value: 123_456,
+          },
+        },
+      },
     },
     profiles: [],
     member: {
@@ -49,6 +61,7 @@ function context() {
         },
       },
       inventory: {},
+      profile_member_id: uuid,
       loadout: {
         armor: {
           "1": {
@@ -120,10 +133,42 @@ describe("agent context capsule", () => {
       armor: { status: "missing" },
       pets: { status: "fresh", itemCount: 1 },
       accessories: { status: "partial", itemCount: 1, warningCount: 1 },
+      storage: { status: "partial" },
+      museum: { status: "fresh", itemCount: 1 },
       readiness: { status: "fresh" },
       objectives: { status: "fresh", activeCount: 1 },
       providerFreshness: { status: "fresh", providerCount: 1 },
       events: { status: "unavailable", included: false },
+    });
+    expect(capsule.profileCompleteness).toMatchObject({
+      selectedMember: {
+        uuid,
+        memberPresent: true,
+        profileMemberId: uuid,
+      },
+      coop: {
+        memberCount: 2,
+        otherMemberCount: 1,
+        selectedMemberPresent: true,
+      },
+    });
+    expect(capsule.storage).toMatchObject({
+      inventory: { status: "missing", availabilityStatus: "api_disabled_or_missing" },
+      enderChest: { status: "missing", availabilityStatus: "api_disabled_or_missing" },
+      backpacks: { status: "missing", availabilityStatus: "api_disabled_or_missing" },
+      personalVault: { status: "missing", availabilityStatus: "api_disabled_or_missing" },
+      sacks: { status: "api_disabled_or_missing", availabilityStatus: "api_disabled_or_missing" },
+    });
+    expect("items" in capsule.storage.inventory).toBe(false);
+    expect("items" in capsule.storage.enderChest).toBe(false);
+    expect("items" in capsule.storage.backpacks).toBe(false);
+    expect("items" in capsule.storage.personalVault).toBe(false);
+    expect(capsule.museum).toMatchObject({
+      status: "fresh",
+      available: true,
+      itemCount: 1,
+      specialItemCount: 1,
+      value: 123_456,
     });
     expect(capsule.sections.readiness.areas).toContainEqual(expect.objectContaining({
       area: "dungeons",
@@ -191,6 +236,14 @@ describe("agent context capsule", () => {
     expect(capsule.readiness.map((entry) => entry.area)).toEqual(["dungeons", "slayer", "kuudra", "garden", "mining"]);
     expect(capsule.warnings).toContainEqual(expect.objectContaining({ code: "snapshot_only_context" }));
     expect(capsule.objectives.active).toContainEqual(expect.objectContaining({ itemKind: "buy" }));
+    expect(capsule.storage).toMatchObject({
+      inventory: { status: "api_disabled_or_missing", availabilityStatus: "api_disabled_or_missing" },
+      enderChest: { status: "api_disabled_or_missing", availabilityStatus: "api_disabled_or_missing" },
+      backpacks: { status: "api_disabled_or_missing", availabilityStatus: "api_disabled_or_missing" },
+      personalVault: { status: "api_disabled_or_missing", availabilityStatus: "api_disabled_or_missing" },
+      sacks: { status: "api_disabled_or_missing", availabilityStatus: "api_disabled_or_missing" },
+    });
+    expect(capsule.profileCompleteness.selectedMember.memberPresent).toBe(true);
     expect(JSON.stringify(capsule)).not.toContain("secret-key");
   });
 
@@ -252,6 +305,69 @@ describe("agent context capsule", () => {
       exact: true,
       estimated: null,
     });
+  });
+
+  test("preserves present-empty sacks in startup storage context", async () => {
+    const base = context();
+    (base.member.inventory as any) = { bag_contents: { sacks_bag: {} } };
+    const capsule = await buildAgentContext(base, {
+      now: 1_000,
+      snapshot: buildProfileSnapshot(base, { ttlMs: 60_000, fetchedAtMs: 1_000 }),
+      providers: { generatedAt: new Date(1_000).toISOString(), providers: [], warnings: [] },
+      accessoriesProvider: async () => ({
+        status: "fresh",
+        valuation: { status: "unavailable" },
+        owned: [],
+        activeAccessories: [],
+        duplicates: [],
+        missing: [],
+        cheapestMissing: [],
+        providerFreshness: [],
+        warnings: [],
+      }),
+    });
+
+    expect(capsule.storage.sacks).toMatchObject({
+      status: "present_empty",
+      availabilityStatus: "present_empty",
+      available: true,
+      itemCount: null,
+      warnings: [],
+    });
+  });
+
+  test("does not treat another coop member museum entry as selected member context", async () => {
+    const base = context();
+    (base.profile as any).museum = {
+      members: {
+        coopmate: { items: { HYPERION: {} } },
+      },
+    };
+    const capsule = await buildAgentContext(base, {
+      now: 1_000,
+      snapshot: buildProfileSnapshot(base, { ttlMs: 60_000, fetchedAtMs: 1_000 }),
+      providers: { generatedAt: new Date(1_000).toISOString(), providers: [], warnings: [] },
+      accessoriesProvider: async () => ({
+        status: "fresh",
+        valuation: { status: "unavailable" },
+        owned: [],
+        activeAccessories: [],
+        duplicates: [],
+        missing: [],
+        cheapestMissing: [],
+        providerFreshness: [],
+        warnings: [],
+      }),
+    });
+
+    expect(capsule.museum).toMatchObject({
+      status: "missing",
+      available: false,
+      memberScoped: false,
+      coopMemberMuseumCount: 1,
+      itemCount: 0,
+    });
+    expect(capsule.sections.museum).toMatchObject({ status: "missing", itemCount: 0 });
   });
 
   test("aggregates cached and stale provider freshness distinctly", async () => {
@@ -348,5 +464,11 @@ describe("agent context capsule", () => {
     expect(capsule.gear.armor.warnings).toContainEqual(expect.objectContaining({ code: "cached_detail_missing", sourcePath: "overview.inventoryApiSignals.hasArmor" }));
     expect(capsule.gear.armor.warnings).toContainEqual(expect.objectContaining({ code: "stale_profile_snapshot", sourcePath: "profile-snapshot-cache" }));
     expect(capsule.accessories.warnings).toContainEqual(expect.objectContaining({ code: "cached_detail_missing", sourcePath: "overview.inventoryApiSignals.hasAccessoryBag" }));
+    expect(capsule.storage.inventory).toMatchObject({
+      status: "stale",
+      availabilityStatus: "api_disabled_or_missing",
+      freshness: { status: "stale", stale: true },
+    });
+    expect(capsule.storage.inventory.warnings).toContainEqual(expect.objectContaining({ code: "stale_profile_snapshot", sourcePath: "profile-snapshot-cache" }));
   });
 });

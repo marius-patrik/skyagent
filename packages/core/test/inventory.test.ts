@@ -287,6 +287,55 @@ describe("inventory extraction", () => {
     expect(section.warnings[0].sourcePath).toBe("inventory.backpack_contents.backpack_1");
   });
 
+  test("decodes hidden storage sections and preserves present-empty state", async () => {
+    const member = {
+      inventory: {
+        inv_contents: { data: payload([item(0, "minecraft:stone", "STONE")]) },
+        ender_chest_contents: { data: payload([item(0, "minecraft:ender_pearl", "ENDER_PEARL")]) },
+        backpack_contents: {
+          backpack_0: { data: payload([item(0, "minecraft:gold_ingot", "ENCHANTED_GOLD")]) },
+        },
+        personal_vault_contents: { data: payload([]) },
+      },
+    };
+
+    const inventory = await inventorySectionFromMember(member, "inventory");
+    const enderChest = await inventorySectionFromMember(member, "ender_chest");
+    const backpacks = await inventorySectionFromMember(member, "backpacks");
+    const personalVault = await inventorySectionFromMember(member, "personal_vault");
+
+    expect(inventory).toMatchObject({ available: true, itemCount: 1, sourcePath: "inventory.inv_contents" });
+    expect(enderChest).toMatchObject({ available: true, itemCount: 1, sourcePath: "inventory.ender_chest_contents" });
+    expect(backpacks).toMatchObject({ available: true, itemCount: 1, sourcePath: "inventory.backpack_contents" });
+    expect(personalVault).toMatchObject({ available: true, itemCount: 0, sourcePath: "inventory.personal_vault_contents" });
+    expect(personalVault.warnings).toEqual([]);
+  });
+
+  test("classifies hidden storage corrupt, unsupported, and missing states with warnings", async () => {
+    const corrupt = await inventorySectionFromMember({
+      inventory: {
+        ender_chest_contents: { data: Buffer.from("bad").toString("base64") },
+      },
+    }, "ender_chest");
+    const unsupported = await inventorySectionFromMember({
+      inventory: {
+        backpack_contents: { unexpected: { item: "not-nbt" } },
+      },
+    }, "backpacks");
+    const missing = await inventorySectionFromMember({}, "personal_vault");
+
+    expect(corrupt).toMatchObject({ available: true, itemCount: 0 });
+    expect(corrupt.warnings).toContainEqual(expect.objectContaining({
+      code: "corrupt_nbt_payload",
+      sourcePath: "inventory.ender_chest_contents",
+    }));
+    expect(unsupported).toMatchObject({ available: true, itemCount: 0 });
+    expect(unsupported.warnings).toContainEqual(expect.objectContaining({ code: "unsupported_section_shape" }));
+    expect(unsupported.warnings[0].sourcePath).toBeUndefined();
+    expect(missing).toMatchObject({ available: false, itemCount: 0 });
+    expect(missing.warnings).toContainEqual(expect.objectContaining({ code: "missing_section" }));
+  });
+
   test("treats present empty pet lists as available empty data", async () => {
     const section = await inventorySectionFromMember({ pets: [] }, "pets");
 

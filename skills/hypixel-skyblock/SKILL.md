@@ -22,7 +22,7 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 ## Default Analysis Flow
 
 1. On a fresh `@SkyAgent` session, or when the user invokes SkyAgent without a narrow command, call `skyagent_start` through `$skyagent-context-engine` before asking for username; use configured player/profile when setup already exists.
-2. Treat startup as the first compact context capsule. Confirm objectives, server/provider status, and recent context events before broad planning.
+2. Treat startup as the first compact context capsule. Confirm profile completeness, hidden storage, Museum signals, objectives, server/provider status, and recent context events before broad planning.
 3. Identify the user's concrete target and constraints from the startup payload, context capsule, objectives, events, and user message.
 4. Use `$skyagent-context-engine` for broad analysis/planning so cached profile context, provider freshness, warnings, and follow-up tools are loaded first.
 5. Use `$skyagent-objectives` to read durable goals, todos, buy lists, source lists, and snipe targets when they may affect recommendations.
@@ -70,7 +70,7 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 
 ## SkyAgent Tooling
 
-- Use `skyagent_start` first for fresh `@SkyAgent` sessions, broad session-scale analysis, or default plugin invocation. It should bootstrap configured identity/profile without asking for username first, return setup status, context capsule, server status, objective summary, recent events/cursor, provider status, warnings, and follow-up tools, and persist `agent.session_start`.
+- Use `skyagent_start` first for fresh `@SkyAgent` sessions, broad session-scale analysis, or default plugin invocation. It should bootstrap configured identity/profile without asking for username first, return setup status, context capsule, profile completeness, storage and Museum signals, server status, objective summary, recent events/cursor, provider status, warnings, and follow-up tools, and persist `agent.session_start`.
 - Use `skyagent_config_get` only when setup metadata is needed without a full startup/context payload.
 - Use `skyagent_llm_provider_status` before persistent-agent or provider-gateway work to verify LiteLLM/OpenAI-compatible model routing, health, auth presence, rate/budget metadata, and redacted endpoint state.
 - Use `skyagent_llm_provider_config_get` and `skyagent_llm_provider_config_set` only for LLM provider gateway setup. Do not use Codex CLI session/config files as the SkyAgent product agent backend.
