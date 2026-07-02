@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createGateway, GatewayClient, startGateway } from "../src/index.ts";
+import { createGateway, GatewayClient, gatewayVersion, startGateway } from "../src/index.ts";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -42,6 +42,11 @@ test("health is public and version requires gateway token", async () => {
 
   const version = await gateway.handle(request("/version", "test-token")).then((response) => response.json());
   expect(version).toEqual({ ok: true, version: "1.2.3", pid: process.pid });
+});
+
+test("gateway version defaults to the compiled release version when present", () => {
+  expect(gatewayVersion("2.1.0")).toBe("2.1.0");
+  expect(gatewayVersion(undefined)).toBe("2.0.0");
 });
 
 test("config routes redact secrets and reject unknown keys", async () => {

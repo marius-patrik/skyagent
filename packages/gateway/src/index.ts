@@ -44,6 +44,8 @@ import {
 } from "@skyagent/core";
 import { createAgentRuntime } from "./agent.ts";
 
+declare const SKYAGENT_BUILD_VERSION: string | undefined;
+
 type GatewayDeps = {
   publicConfig: typeof publicConfig;
   setConfigValue: typeof setConfigValue;
@@ -229,9 +231,13 @@ function validateNonSecretProviderBaseUrl(value: unknown) {
   return null;
 }
 
+export function gatewayVersion(buildVersion = typeof SKYAGENT_BUILD_VERSION === "string" ? SKYAGENT_BUILD_VERSION : undefined) {
+  return typeof buildVersion === "string" ? buildVersion : "2.0.0";
+}
+
 export function createGateway(options: GatewayOptions = {}) {
   const token = options.token ?? randomToken();
-  const version = options.version ?? "2.0.0";
+  const version = options.version ?? gatewayVersion();
   const deps: GatewayDeps = { ...defaultDeps, ...options.deps };
   const agent = createAgentRuntime({
     startSkyAgentSession: deps.startSkyAgentSession,
