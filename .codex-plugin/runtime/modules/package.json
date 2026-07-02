@@ -15,7 +15,7 @@
   },
   "scripts": {
     "check": "bun run typecheck && bun run test && bun run smoke",
-    "ci": "bun run check && bun run validate:plugin && bun run validate:generated && bun run validate:skill && bun run build:release -- --current && bun run smoke:release",
+    "ci": "bun run check && bun run validate:plugin && bun run validate:generated && bun run validate:skill && bun run validate:automerge-release && bun run build:release -- --current && bun run smoke:release",
     "build:web": "bun run --cwd packages/web build",
     "build:release": "bun ./scripts/build-release.ts",
     "dev:web": "bun run --cwd packages/web dev",
@@ -29,6 +29,7 @@
     "smoke:release": "bun ./scripts/smoke-release.ts",
     "prepare:plugin-runtime": "bun ./scripts/prepare-plugin-runtime.ts",
     "validate:generated": "bun ./scripts/ci/validate-generated.ts",
+    "validate:automerge-release": "bun ./scripts/ci/validate-automerge-release.ts",
     "validate:plugin": "bun ./scripts/ci/validate-plugin.ts",
     "validate:skill": "bun ./scripts/ci/validate-skill.ts"
   },
