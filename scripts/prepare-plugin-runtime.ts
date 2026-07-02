@@ -29,6 +29,7 @@ const shims: PackageShim[] = [
       ".": "src/index.ts",
       "./accessories": "src/accessories.ts",
       "./agent-context": "src/agent-context.ts",
+      "./behavior-playbook": "src/behavior-playbook.ts",
       "./context-events": "src/context-events.ts",
       "./hypixel": "src/hypixel.ts",
       "./inventory": "src/inventory.ts",

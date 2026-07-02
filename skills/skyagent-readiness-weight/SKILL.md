@@ -20,6 +20,7 @@ Use this skill when the user asks whether a profile is ready for an activity, as
 - Use `$skyagent-live-progress` when recent profile refresh events or session progress may have changed readiness.
 - Use `$skyagent-objectives` when readiness gaps should become todos, buy-list entries, source-item tasks, or snipe targets.
 - Route pure section summaries back to `$skyagent-progression`.
+- For damage or Slayer advice, pair `skyblock_readiness` with `$skyagent-inventory-items` for armor/equipment/wardrobe/storage, `$skyagent-accessories` for Magical Power, and `$skyagent-provider-maintenance` for meta freshness before recommending purchases.
 
 ## Rules
 
@@ -30,3 +31,4 @@ Use this skill when the user asks whether a profile is ready for an activity, as
 - Verify current external meta before strong recommendations about F7/M7, Slayer tiers, Kuudra tiers, Garden contests, Mining methods, or patch-sensitive gear thresholds.
 - If required profile sections are missing, report readiness as unknown or partial instead of filling gaps with assumptions.
 - Refresh context after major gear, pet, accessory, or progression changes before recalculating readiness.
+- If gear, pets, accessories, or profile sections are missing, state the missing readiness input and use the best narrow fallback before recommending buys.

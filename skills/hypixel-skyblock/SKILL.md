@@ -22,15 +22,27 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 ## Default Analysis Flow
 
 1. On a fresh `@SkyAgent` session, or when the user invokes SkyAgent without a narrow command, call `skyagent_start` through `$skyagent-context-engine` before asking for username; use configured player/profile when setup already exists.
-2. Identify the user's concrete target and constraints from the startup payload, context capsule, objectives, events, and user message.
-3. Use `$skyagent-context-engine` for broad analysis/planning so cached profile context, provider freshness, warnings, and follow-up tools are loaded first.
-4. Use `$skyagent-objectives` to read durable goals, todos, buy lists, source lists, and snipe targets when they may affect recommendations.
-5. Use `$skyagent-live-progress` when recent context-stream events, server status, provider/cache changes, profile refresh events, or the `agent.session_start` cursor may already describe the user's progress.
-6. Route to the narrow SkyAgent subskill when the task is clearly profile/API, inventory/items, economy, accessories, progression, readiness/weight, planning, or provider maintenance.
-7. Pull current profile state through SkyAgent MCP tools when available.
-8. Check whether the target depends on recent patches, economy shifts, or known meta changes.
-9. Compare the user's current bottlenecks against the target.
-10. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
+2. Treat startup as the first compact context capsule. Confirm objectives, server/provider status, and recent context events before broad planning.
+3. Identify the user's concrete target and constraints from the startup payload, context capsule, objectives, events, and user message.
+4. Use `$skyagent-context-engine` for broad analysis/planning so cached profile context, provider freshness, warnings, and follow-up tools are loaded first.
+5. Use `$skyagent-objectives` to read durable goals, todos, buy lists, source lists, and snipe targets when they may affect recommendations.
+6. Use `$skyagent-live-progress` when recent context-stream events, server status, provider/cache changes, profile refresh events, or the `agent.session_start` cursor may already describe the user's progress.
+7. Route to the narrow SkyAgent subskill when the task is clearly profile/API, inventory/items, economy, accessories, progression, readiness/weight, planning, or provider maintenance.
+8. Pull current profile state through SkyAgent MCP tools when available.
+9. Check whether the target depends on recent patches, economy shifts, or known meta changes.
+10. Compare the user's current bottlenecks against the target.
+11. Produce a prioritized route with immediate actions, optional upgrades, and what to skip.
+
+## Behavioral Playbook
+
+- Follow the repo playbook in `docs/agent-behavior.md`: compact context first, objectives second, provider/server status third, then narrow tools from the follow-up map.
+- Prefer compact summaries over raw payloads. Use raw profile/member/item payloads only for explicit debug requests or when no summary/parser exists, then extract bounded fields.
+- If MCP tools are unavailable, try the equivalent non-interactive `skyagent` CLI JSON command before telling the user the capability is missing.
+- If cache is stale, refresh for current-state, purchase, profile, or meta-sensitive decisions; otherwise keep stale warnings visible.
+- If a parser or summary is missing, use the narrow raw endpoint fallback (`skyblock_profile_section`, `skyblock_museum`, `skyblock_profile_member`, or `hypixel_request`) before saying SkyAgent cannot inspect it.
+- If payloads are huge, switch to summaries, section tools, normalized items, or bounded extraction instead of dumping raw data.
+- If the API key is missing, use cache-only context and public resources where possible, then return setup guidance without exposing secrets.
+- If Hypixel/server/provider status is degraded or partial, preserve the degraded freshness warning and avoid strong current-meta or purchase claims.
 
 ## Subskill Routing
 
@@ -45,6 +57,16 @@ Use this skill when the user asks for Hypixel SkyBlock profile analysis, progres
 - Use `$skyagent-readiness-weight` for Senither/Lily-style weight status, unsupported exact formulas, formula freshness, and readiness for dungeons, slayer, kuudra, garden, or mining.
 - Use `$skyagent-planning` for goal plans, next upgrades, upgrade priority, budget-constrained recommendations, blockers, daily/weekly routes, prerequisites, and what to skip.
 - Use `$skyagent-provider-maintenance` for patch-sensitive metas, patch notes, wiki pages, NEU/SkyHelper/CoflNet assumptions, provider freshness, stale formulas, parity drift, or official-source verification.
+
+## Common Goal Routing
+
+- Museum goals: bootstrap context and objectives, use `$skyagent-progression`/`skyblock_profile_section` for `museum`, fall back to `skyblock_museum` or `hypixel_request`, then inspect hidden gear/storage through `$skyagent-inventory-items` before pricing donation candidates.
+- Money routes: bootstrap context, check networth/capital, progression unlocks, relevant readiness, provider freshness, and price volatility before recommending routes.
+- Damage or Slayer goals: bootstrap context, check `skyblock_readiness` for `slayer`, inspect armor/equipment/current inventory/wardrobe/storage/museum signals, pets, accessories/Magical Power, budget, prices, and provider freshness before recommending purchases.
+- Accessories: route to `$skyagent-accessories` for Magical Power, missing accessories, duplicates, enrichment, recombobulation, and coin-per-MP upgrades.
+- Pets: route to `$skyagent-inventory-items` and `$skyagent-progression` for active pet, pet inventory, held item, level assumptions, and relevant alternatives.
+- Wardrobe/current gear: route to `$skyagent-inventory-items` for wardrobe, armor, equipment, loadout fallback state, storage, and normalized modifiers before judging readiness.
+- Objective building: use `$skyagent-planning` for preview candidates, then `$skyagent-objectives` only after the user accepts persistence.
 
 ## SkyAgent Tooling
 

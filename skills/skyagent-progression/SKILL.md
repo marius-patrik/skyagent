@@ -19,6 +19,7 @@ Use this skill when the user asks where their profile stands, wants SkyCrypt-sty
 - Use `$skyagent-context-engine` for broad progression questions; prefer `skyagent_start` when no startup payload is present so cached profile context, objective summaries, server status, recent events, provider freshness, and follow-up tools are loaded first.
 - Use `$skyagent-live-progress` when recent skill gains, Slayer kills, dungeon runs, Garden changes, profile refreshes, or explicit progress events may affect section status.
 - Use `$skyagent-objectives` when progression gaps should become todos, source-item tasks, or tracked objective progress.
+- For Museum goals, use the `museum` section before generic progression. If the summary is missing, fall back to `skyblock_museum`, `skyblock_profile_member`, or `hypixel_request` for bounded museum-field extraction.
 
 ## Rules
 
@@ -28,3 +29,4 @@ Use this skill when the user asks where their profile stands, wants SkyCrypt-sty
 - Treat absent sections, disabled APIs, and partial profile payloads as missing data, not as proof the user has no progress.
 - Verify current external meta before making patch-sensitive claims about Dungeons, Slayer, Kuudra, Garden, Mining, or Rift priorities.
 - Refresh context before comparing a new progression state against an existing plan.
+- Do not turn missing Museum or section parser support into generic advice; extract the narrow official fields first and mark parser coverage as partial.

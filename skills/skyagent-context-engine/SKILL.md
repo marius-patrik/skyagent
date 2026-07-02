@@ -26,9 +26,11 @@ Use this skill when Codex needs the compact profile context before analysis, pla
 ## Rules
 
 - Do not ask for a Minecraft username before `skyagent_start` has checked configured identity/profile for a fresh SkyAgent session.
-- Prefer the context capsule over repeated raw profile pulls for broad answers.
+- Prefer the context capsule over repeated raw profile pulls for broad answers; raw/member payloads are debug or fallback tools, not the default.
 - Preserve `fetchedAt`, cache status, stale status, provider freshness, warnings, and follow-up tool hints.
 - Treat stale context as advisory unless the user explicitly accepts stale data or the answer is not freshness-sensitive.
 - Refresh context before revising a plan after the user reports new gear, purchases, skill progress, profile changes, or market-sensitive decisions.
 - Do not store API keys or secrets in context, memories, objectives, or summaries.
 - Keep context output compact. Pull raw member payloads, item dumps, or full item arrays only when a narrow tool is needed.
+- If MCP startup tools are unavailable, use `skyagent start --json` or `skyagent context --cache-only --allow-stale` before telling the user that startup is blocked.
+- If the API key is missing, use cache-only context and public resources where possible, then return setup guidance without printing secrets.

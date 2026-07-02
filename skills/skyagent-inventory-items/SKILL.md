@@ -21,6 +21,8 @@ Use this skill when the task depends on item stacks, inventory API state, decode
 - Use `$skyagent-context-engine` first for broad gear, wardrobe, pets, accessories, or profile-context questions; prefer `skyagent_start` when no startup payload is present so cached context, objective summary, server status, events, and follow-up tool hints are available.
 - Use `$skyagent-live-progress` when recent inventory/profile refresh events may explain changed gear, pet swaps, purchases, or missing progress.
 - Use `$skyagent-objectives` when item findings should become source-item, buy-list, or snipe-target records.
+- For damage, Slayer, or money-route advice, inspect hidden context as well as current gear: wardrobe/loadout fallback, backpacks, ender chest, personal vault, pets, accessories, and museum-related item signals before judging readiness or recommending purchases.
+- For Museum goals, use normalized item records across storage sections to find likely donor candidates before suggesting buy/source targets.
 
 ## Rules
 
@@ -31,3 +33,4 @@ Use this skill when the task depends on item stacks, inventory API state, decode
 - If item metadata is unavailable, continue with normalized item IDs and mark metadata-backed fields as unavailable.
 - Do not infer item modifiers that are not present in normalized records.
 - Refresh context after meaningful item changes before recalculating plans or readiness.
+- If a section parser is missing or disabled, use the narrowest available section/raw debug fallback and mark that section as partial instead of treating it as empty.
