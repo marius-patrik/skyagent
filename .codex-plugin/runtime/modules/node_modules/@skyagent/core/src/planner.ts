@@ -3,7 +3,7 @@ import { agentContextForPlayer } from "./agent-context.ts";
 import { networthForContext } from "./networth.ts";
 import { createObjectiveItem, objectiveContextSummary, updateObjectiveItem } from "./objectives.ts";
 import { fetchProfileContext } from "./profile.ts";
-import { readinessFromContext, READINESS_AREAS } from "./readiness.ts";
+import { readinessFromContext, readinessGearContextFromMember, readinessTargetFromGoal, READINESS_AREAS } from "./readiness.ts";
 import { progressionFromContext } from "./sections/index.ts";
 import { publicConfig, readMemories } from "./store.ts";
 
@@ -75,6 +75,42 @@ function recommendation(input: {
   };
 }
 
+function toolForReadinessBlocker(area: string, check: any) {
+  const blocker = String(check.blocker ?? check.name ?? "").toLowerCase();
+  if (blocker.includes("accessor") || check.name === "magical_power") {
+    return "skyblock_accessory_upgrades";
+  }
+  if (blocker.includes("armor") || blocker.includes("weapon") || blocker.includes("equipment") || blocker.includes("pet")) {
+    return "skyblock_inventory_section";
+  }
+  if (blocker.includes("modifier") || check.name === "item_modifiers_present") {
+    return "skyblock_normalized_items";
+  }
+  if (area === "dungeons" || area === "slayer" || area === "kuudra" || area === "garden" || area === "mining") {
+    return "skyblock_profile_section";
+  }
+  return "skyblock_progression";
+}
+
+function readinessBlockerRoutes(result: any) {
+  return (result.checks ?? [])
+    .filter((check: any) => !check.passed)
+    .map((check: any) => ({
+      area: result.area,
+      target: result.target,
+      check: check.name,
+      blocker: check.blocker ?? check.name,
+      sourceField: check.sourceField,
+      actual: check.actual,
+      targetValue: check.target,
+      followUpTool: toolForReadinessBlocker(result.area, check),
+      toolArguments: {
+        area: result.area,
+        section: check.sourceField ?? result.area,
+      },
+    }));
+}
+
 function readinessRecommendations(readiness: any[]) {
   const output = [];
   for (const result of readiness) {
@@ -82,14 +118,15 @@ function readinessRecommendations(readiness: any[]) {
       if (check.passed) {
         continue;
       }
+      const followUpRoute = readinessBlockerRoutes({ ...result, checks: [check] })[0];
       output.push(recommendation({
         id: `${result.area}-${check.name}`,
         title: `Improve ${result.area.replace("_", " ")}: ${check.name.replace(/_/g, " ")}`,
         category: "readiness",
         priority: result.rating === "unknown" ? 40 : 70,
-        reason: `Current value ${JSON.stringify(check.actual)} is below target ${JSON.stringify(check.target)} for ${result.area} readiness.`,
+        reason: `Readiness blocker ${check.name}: current value ${JSON.stringify(check.actual)} is below target ${JSON.stringify(check.target)} for ${result.target?.label ?? result.area}.`,
         expectedImpact: `Moves the ${result.area} readiness estimate toward ready status.`,
-        prerequisites: [{ sourceField: check.sourceField, target: check.target }],
+        prerequisites: [{ sourceField: check.sourceField, target: check.target, actual: check.actual, blocker: check.blocker ?? check.name, followUpRoute }],
         sourceFreshness: result.freshness,
         uncertainty: "heuristic",
         warnings: result.warnings,
@@ -373,7 +410,7 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   if (budget !== null && (!Number.isFinite(budget) || budget < 0)) {
     throw new Error("budget must be a non-negative finite number when provided.");
   }
-  const readiness = areas.map((area) => readinessFromContext(context, area));
+  const readinessGearContext = await readinessGearContextFromMember(context.member);
   const progression = await (options.progressionProvider ?? progressionFromContext)(context);
   const networth = await (options.networthProvider ?? ((input: any) => networthForContext(input, {
     maxItems: options.maxItems ?? 150,
@@ -385,6 +422,16 @@ export async function planGoalFromContext(context: any, goal: string, options: {
     maxPriceLookups: options.maxPriceLookups ?? 75,
     timeoutMs: options.accessoryTimeoutMs ?? 8_000,
   })))(context.member, budget);
+  const providerFreshness = [
+    ...(networth?.providerFreshness ?? []).map((entry: any) => ({ ...entry, providerKind: "networth" })),
+    ...(accessories?.providerFreshness ?? []).map((entry: any) => ({ ...entry, providerKind: "accessories" })),
+  ];
+  const readiness = areas.map((area) => readinessFromContext(context, area, {
+    target: readinessTargetFromGoal(goal, area),
+    gearContext: readinessGearContext,
+    budget,
+    providerFreshness,
+  }));
   const memories = options.memories ?? readMemories();
   const config = options.config ?? publicConfig();
   const contextCapsule = options.contextCapsule ?? null;
@@ -397,6 +444,7 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   ]);
   const workItems = planWorkItems(recommendations, budget);
   const persistedObjectives = options.persistObjectives ? persistPlanObjectives(goal, workItems, options) : null;
+  const readinessRoutes = readiness.flatMap((entry) => readinessBlockerRoutes(entry));
 
   return {
     uuid: context.uuid,
@@ -424,7 +472,16 @@ export async function planGoalFromContext(context: any, goal: string, options: {
           warningCount: (section.warnings ?? []).length,
           formulas: section.provenance?.formulas ?? [],
         })),
-      readiness: readiness.map((entry) => ({ area: entry.area, rating: entry.rating, failedChecks: (entry.checks ?? []).filter((check: any) => !check.passed).map((check: any) => check.name) })),
+      readiness: readiness.map((entry) => ({
+        area: entry.area,
+        target: entry.target,
+        rating: entry.rating,
+        failedChecks: (entry.checks ?? []).filter((check: any) => !check.passed).map((check: any) => check.name),
+        blockers: readinessBlockerRoutes(entry),
+        followUpTools: [...new Set(readinessBlockerRoutes(entry).map((route: any) => route.followUpTool))],
+        readinessContext: entry.readinessContext,
+      })),
+      readinessFollowUpRoutes: readinessRoutes,
       accessoryUpgradeCount: accessories?.upgrades?.length ?? 0,
       memoryCount: memories.length,
       usedMemories: relevantMemories(goal, memories),
@@ -460,6 +517,7 @@ export async function planGoalFromContext(context: any, goal: string, options: {
       profile: contextCapsule?.cache ?? { status: "live", sourceProvider: "hypixel" },
       networthProviders: networth?.providerFreshness ?? [],
       accessoryProviders: accessories?.providerFreshness ?? [],
+      readinessProviders: providerFreshness,
       profileSectionFormulas: [...new Set((progression?.sections ?? []).flatMap((section: any) => section.provenance?.formulas ?? []))],
     },
     assumptions: [

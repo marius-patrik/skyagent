@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { createGateway, GatewayClient, gatewayVersion, startGateway } from "../src/index.ts";
+import { systemPrompt } from "../src/agent.ts";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -42,6 +43,18 @@ test("health is public and version requires gateway token", async () => {
 
   const version = await gateway.handle(request("/version", "test-token")).then((response) => response.json());
   expect(version).toEqual({ ok: true, version: "1.2.3", pid: process.pid });
+});
+
+test("persistent agent prompt routes readiness blockers into follow-up tools", () => {
+  const prompt = systemPrompt({
+    followUpTools: { planning: ["skyblock_plan_goal"], inventory: ["skyblock_inventory_section"] },
+    context: { sections: { readiness: { areas: [{ area: "slayer", failedChecks: ["gear_weapon_present"] }] } } },
+  });
+
+  expect(prompt).toContain("failedChecks");
+  expect(prompt).toContain("blocker");
+  expect(prompt).toContain("readinessContext");
+  expect(prompt).toContain("matching SkyAgent tool");
 });
 
 test("gateway version defaults to the compiled release version when present", () => {

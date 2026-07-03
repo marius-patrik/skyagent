@@ -128,6 +128,11 @@ test("valuation-heavy MCP tools expose bounded agent controls", () => {
     maxPriceLookups: { type: "number" },
     timeoutMs: { type: "number" },
   });
+  expect(tools.find((tool) => tool.name === "skyblock_readiness")?.inputSchema).toMatchObject({
+    properties: {
+      budget: { type: "number" },
+    },
+  });
   expect(schemaFor("skyblock_plan_goal")).toMatchObject({
     useContext: { type: "boolean" },
     persistObjectives: { type: "boolean" },

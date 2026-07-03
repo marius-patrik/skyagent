@@ -86,7 +86,7 @@ Usage:
   skyagent section <name> [nameOrUuid] [profileIdOrName]
   skyagent progression [nameOrUuid] [profileIdOrName]
   skyagent weight [nameOrUuid] [profileIdOrName]
-  skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]
+  skyagent readiness <area[:target]> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--max-items <n>] [--networth-timeout-ms <ms>] [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
   skyagent plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--use-context] [--persist-objectives] [--objective <id>] [--max-items <n>] [--networth-timeout-ms <ms>] [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
   skyagent museum-plan <goal> [nameOrUuid] [profileIdOrName] [--budget <coins>] [--max-price-lookups <n>] [--timeout-ms <ms>] [--persist-objectives]
   skyagent next-upgrades [nameOrUuid] [profileIdOrName] --budget <coins> [--max-price-lookups <n>] [--accessory-timeout-ms <ms>]
@@ -340,6 +340,19 @@ export function parsePlanArgs(args) {
     useContext: args.includes("--use-context"),
     persistObjectives: args.includes("--persist-objectives"),
     objectiveId: optionValue(args, "--objective"),
+    maxItems: optionalNumericOption(args, "--max-items") ?? DEFAULT_NETWORTH_MAX_ITEMS,
+    networthTimeoutMs: optionalNumericOption(args, "--networth-timeout-ms") ?? DEFAULT_NETWORTH_TIMEOUT_MS,
+    maxPriceLookups: optionalNumericOption(args, "--max-price-lookups") ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
+    accessoryTimeoutMs: optionalNumericOption(args, "--accessory-timeout-ms") ?? DEFAULT_ACCESSORY_TIMEOUT_MS,
+  };
+}
+
+export function parseReadinessArgs(args) {
+  const budget = optionValue(args, "--budget");
+  return {
+    area: args[0] ?? null,
+    budget: budget === null ? null : Number(budget),
+    values: positionalArgs(args.slice(1), ["--budget", "--max-items", "--networth-timeout-ms", "--max-price-lookups", "--accessory-timeout-ms"]),
     maxItems: optionalNumericOption(args, "--max-items") ?? DEFAULT_NETWORTH_MAX_ITEMS,
     networthTimeoutMs: optionalNumericOption(args, "--networth-timeout-ms") ?? DEFAULT_NETWORTH_TIMEOUT_MS,
     maxPriceLookups: optionalNumericOption(args, "--max-price-lookups") ?? DEFAULT_ACCESSORY_MAX_PRICE_LOOKUPS,
@@ -1023,10 +1036,20 @@ export async function command(args) {
   }
 
   if (area === "readiness") {
-    if (!action) {
-      throw new Error("Usage: skyagent readiness <dungeons|slayer|kuudra|garden|mining> [nameOrUuid] [profileIdOrName]");
+    const parsed = parseReadinessArgs([action, ...rest].filter(Boolean));
+    if (!parsed.area) {
+      throw new Error("Usage: skyagent readiness <area[:target]> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
     }
-    output(await readinessForPlayer(action, rest[0], rest[1]));
+    if (parsed.budget !== null && (!Number.isFinite(parsed.budget) || parsed.budget < 0)) {
+      throw new Error("Usage: skyagent readiness <area[:target]> [nameOrUuid] [profileIdOrName] [--budget <coins>]");
+    }
+    output(await readinessForPlayer(parsed.area, parsed.values[0], parsed.values[1], {
+      budget: parsed.budget,
+      maxItems: parsed.maxItems,
+      networthTimeoutMs: parsed.networthTimeoutMs,
+      maxPriceLookups: parsed.maxPriceLookups,
+      accessoryTimeoutMs: parsed.accessoryTimeoutMs,
+    }));
     return;
   }
 

@@ -517,13 +517,14 @@ export const tools = [
   },
   {
     name: "skyblock_readiness",
-    description: "Estimate readiness for dungeons, slayer, kuudra, garden, or mining with source fields, assumptions, freshness, and missing-data warnings; pair Slayer/damage advice with gear, pet, accessory, budget, and provider checks.",
+    description: "Estimate target-aware readiness for dungeons, slayer, kuudra, garden, or mining with gear, pet, accessory, modifier, source-field, freshness, and missing-data warnings. Area may include a target suffix such as dungeons:f7, slayer:zombie:t4, or kuudra:burning.",
     inputSchema: {
       type: "object",
       properties: {
-        area: { type: "string", enum: ["dungeons", "slayer", "kuudra", "garden", "mining"] },
+        area: { type: "string" },
         player: { type: "string" },
         profile: { type: "string" },
+        budget: { type: "number" },
       },
       required: ["area"],
       additionalProperties: false,
@@ -1018,7 +1019,10 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
     }
     case "skyblock_readiness": {
       const { readinessForPlayer } = await import("@skyagent/core/readiness");
-      return readinessForPlayer(args.area, args.player, args.profile);
+      if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
+        throw new Error("budget must be a non-negative finite number when provided.");
+      }
+      return readinessForPlayer(args.area, args.player, args.profile, { budget: args.budget ?? null });
     }
     case "skyblock_plan_goal":
       if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {

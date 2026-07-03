@@ -53,11 +53,11 @@ Museum goals must not fall back to generic progression first. Route them through
 4. Fall back to `skyblock_museum`, `hypixel_request` for `skyblock/museum`, or bounded member extraction only for planner-missing fields.
 5. Inspect inventory, ender chest, backpacks, personal vault, wardrobe, pets, accessory bag, and normalized item records only as follow-up evidence when the planner reports uncertain candidates.
 
-Damage and Slayer goals must inspect complete readiness before purchases:
+Damage, Slayer, Dungeon, and Kuudra goals must inspect complete target-aware readiness before purchases:
 
 1. Bootstrap context and objectives.
-2. Use `skyblock_readiness` for `slayer`.
-3. Inspect armor, equipment, inventory, wardrobe, storage, Museum signals, pets, accessories, Magical Power, and item modifiers.
+2. Use `skyblock_readiness` with the concrete target string when known, such as `slayer:zombie:t4`, `slayer:eman:t4`, `dungeons:f7`, `dungeons:m7`, or `kuudra:burning`.
+3. Treat the returned armor, equipment, weapon, wardrobe/storage-derived gear context, pets, Magical Power/accessory, item modifiers, source freshness, and missing-field blockers as the first readiness evidence.
 4. Check budget and price evidence with `skyblock_next_upgrades`, `skyblock_price`, or `skyblock_lowest_bin`.
 5. Route meta-sensitive claims through provider freshness and current-source checks before recommending buys.
 

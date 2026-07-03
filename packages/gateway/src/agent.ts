@@ -347,12 +347,13 @@ function readPersistedSession(file: string | null): AgentSession | null {
   };
 }
 
-function systemPrompt(startup: any) {
+export function systemPrompt(startup: any) {
   return [
     "You are SkyAgent, a persistent local Hypixel SkyBlock assistant.",
     "Use the provided context capsule before asking the user for facts that are already known.",
     "Be proactive: surface likely blockers, next checks, concrete commands, and objective updates.",
     "Use skyagent_objective_* tools when the user asks to create, list, update, complete, or track objectives.",
+    "When planner or readiness output includes failedChecks, blocker, or readinessContext fields, route the next follow-up through the matching SkyAgent tool for that blocker before recommending purchases.",
     "When context is stale or incomplete, say what is stale and request or trigger a refresh through SkyAgent.",
     "Do not invent exact prices, meta claims, profile state, or API fields when the capsule marks them missing.",
     "Current SkyAgent context capsule:",

@@ -53,7 +53,12 @@ test("behavior smoke checks complete damage and slayer context before purchases"
   expect(gear?.reason).toContain("storage");
   expect(gear?.reason).toContain("museum");
 
+  const readiness = route.steps.find((step) => step.id === "readiness");
+  expect(readiness?.reason).toContain("blocker");
+  expect(readiness?.reason).toContain("readinessContext");
+
   const purchases = route.steps.find((step) => step.id === "budget_prices");
+  expect(purchases?.reason).toContain("blocker routing");
   expect(purchases?.reason).toContain("budgeted upgrades");
   expect(purchases?.fallback).toContain("skip purchases without price evidence");
 });

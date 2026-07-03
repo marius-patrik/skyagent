@@ -7,7 +7,7 @@ import { emitContextEvent } from "@skyagent/core/context-events";
 import { publicLlmProviderConfig } from "@skyagent/core/llm-provider";
 import { listObjectiveItems } from "@skyagent/core/objectives";
 import { stopGatewayProcess } from "@skyagent/gateway/manager";
-import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseMuseumPlanArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseMuseumPlanArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseReadinessArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
@@ -195,6 +195,18 @@ describe("CLI argument parsing", () => {
 
   test("plan validates budget before fetching profile data", async () => {
     await expect(command(["plan", "f7", "--budget", "-1"])).rejects.toThrow("Usage: skyagent plan");
+  });
+
+  test("readiness parses budget and provider bounds", () => {
+    expect(parseReadinessArgs(["dungeons:f7", "Notch", "Apple", "--budget", "1000000", "--max-items", "50", "--networth-timeout-ms", "1000", "--max-price-lookups", "25", "--accessory-timeout-ms", "1500"])).toEqual({
+      area: "dungeons:f7",
+      budget: 1_000_000,
+      values: ["Notch", "Apple"],
+      maxItems: 50,
+      networthTimeoutMs: 1000,
+      maxPriceLookups: 25,
+      accessoryTimeoutMs: 1500,
+    });
   });
 
   test("museum-plan parses goal player profile budget and bounds", () => {
