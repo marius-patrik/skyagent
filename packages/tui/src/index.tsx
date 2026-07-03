@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Box, Text, render, useApp, useInput } from "ink";
 import { publicConfig } from "@skyagent/core";
+import { SURFACE_CONTRACTS, trackedTuiContractGaps } from "@skyagent/core/surface-contracts";
 import { gatewayClient } from "@skyagent/gateway/manager";
 
 type MenuId = "agent" | "status" | "profiles" | "overview" | "debug" | "advanced";
@@ -136,6 +137,13 @@ export function tuiSnapshot() {
   return {
     ...status,
     screens: MENU.map((item) => item.id),
+    contractCoverage: SURFACE_CONTRACTS.map((contract) => ({
+      id: contract.id,
+      status: contract.tui.status,
+      screens: contract.tui.screens,
+      issue: contract.tui.issue ?? null,
+    })),
+    trackedContractGaps: trackedTuiContractGaps(),
     shortcuts: ["up/down or j/k", "left/right or h/l", "enter", "r", "q", "agent text input", "tab add objective", "[/] select objective", "x complete objective"],
     secrets: "api keys are never printed",
   };

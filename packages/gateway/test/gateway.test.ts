@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { createGateway, GatewayClient, gatewayVersion, startGateway } from "../src/index.ts";
 import { systemPrompt } from "../src/agent.ts";
+import { allContractGatewayClientMethods, allContractGatewayRoutes } from "@skyagent/core/surface-contracts";
 import { contextEventBus } from "@skyagent/core/context-events";
 import fs from "node:fs";
 import net from "node:net";
@@ -61,6 +62,178 @@ test("persistent agent prompt routes readiness blockers into follow-up tools", (
 test("gateway version defaults to the compiled release version when present", () => {
   expect(gatewayVersion("2.1.0")).toBe("2.1.0");
   expect(gatewayVersion(undefined)).toBe("2.0.0");
+});
+
+function routeProbe(route: string) {
+  const [method, pathname] = route.split(" ");
+  const queryByPath: Record<string, string> = {
+    "/inventory-section": "?section=inventory",
+    "/items/metadata": "?id=STONE",
+    "/item-networth": "?section=armor",
+    "/accessories/upgrades": "?budget=1",
+    "/section": "?section=skills",
+    "/readiness": "?area=dungeons:f7",
+    "/plan": "?goal=f7",
+    "/museum/plan": "?goal=museum",
+    "/next-upgrades": "?budget=1",
+    "/price": "?itemId=STONE",
+    "/lbin": "?itemId=STONE",
+    "/price-history": "?itemId=STONE",
+    "/resource": "?kind=items",
+  };
+  const bodyByRoute: Record<string, unknown> = {
+    "POST /context/refresh": {},
+    "POST /context/events": { type: "test.route_probe", payload: {} },
+    "POST /museum/plan": { goal: "museum" },
+    "POST /llm-provider/config": {},
+    "POST /agent/start": {},
+    "POST /agent/context/refresh": {},
+    "POST /agent/objectives": { action: "list" },
+  };
+  return request(`${pathname}${queryByPath[pathname] ?? ""}`, "test-token", {
+    method,
+    ...(bodyByRoute[route] ? { body: JSON.stringify(bodyByRoute[route]) } : {}),
+  });
+}
+
+test("gateway runtime handles every contract route and exposes every contract client method", async () => {
+  const deps = {
+    publicConfig: () => ({}),
+    setConfigValue: () => ({}),
+    uuidFromNameOrUuid: async () => "uuid",
+    skyblockProfiles: async () => ({ body: { profiles: [] }, rateLimit: null }),
+    profileSummaries: () => [],
+    fetchProfileContext: async () => ({}),
+    compactProfileOverview: () => ({}),
+    agentContextForPlayer: async () => ({}),
+    serverStatusForPlayer: async () => ({}),
+    readContextEvents: () => ({ events: [] }),
+    emitContextEvent: (event: any) => event,
+    subscribeContextEvents: () => () => {},
+    inventoryForPlayer: async () => ({}),
+    inventorySectionForPlayer: async () => ({}),
+    normalizedItemsForPlayer: async () => [],
+    itemMetadata: async () => ({}),
+    networthForPlayer: async () => ({}),
+    itemNetworthForPlayer: async () => ({}),
+    accessoriesForPlayer: async () => ({}),
+    missingAccessoriesForPlayer: async () => ({}),
+    accessoryUpgradesForPlayer: async () => ({}),
+    profileSectionForPlayer: async () => ({}),
+    progressionForPlayer: async () => ({}),
+    weightForPlayer: async () => ({}),
+    readinessForPlayer: async () => ({}),
+    planGoalForPlayer: async () => ({}),
+    museumDonationPlanForPlayer: async () => ({}),
+    nextUpgradesForPlayer: async () => ({}),
+    providerStatus: () => ({}),
+    emitProviderStatusEvent: () => {},
+    itemPrice: async () => ({}),
+    lowestBin: async () => ({}),
+    coflnetPriceHistory: async () => ({}),
+    llmProviderStatus: async () => ({}),
+    publicLlmProviderConfig: () => ({}),
+    setLlmProviderConfigValue: () => ({}),
+    startSkyAgentSession: async () => ({}),
+    streamLlmChat: async function* () {},
+    listObjectiveItems: () => [],
+    objectiveContextSummary: () => ({}),
+    createObjectiveItem: () => ({}),
+    updateObjectiveItem: () => ({}),
+    completeObjectiveItem: () => ({}),
+    hypixelRequest: async () => ({}),
+    resourceEndpoint: (kind: string) => `resources/skyblock/${kind}`,
+  } as any;
+  const gateway = createGateway({ token: "test-token", deps });
+  for (const route of allContractGatewayRoutes()) {
+    const response = await gateway.handle(routeProbe(route));
+    expect(response.status, route).not.toBe(404);
+  }
+  for (const method of allContractGatewayClientMethods()) {
+    expect(typeof (GatewayClient.prototype as any)[method]).toBe("function");
+  }
+});
+
+test("gateway routes and client methods preserve bounded valuation options", async () => {
+  const calls: Record<string, any> = {};
+  const gateway = createGateway({
+    token: "test-token",
+    deps: ({
+      networthForPlayer: async (_player, _profile, options) => {
+        calls.networth = options;
+        return { ok: true };
+      },
+      itemNetworthForPlayer: async (_player, _profile, _section, options) => {
+        calls.itemNetworth = options;
+        return { ok: true };
+      },
+      accessoriesForPlayer: async (_player, _profile, options) => {
+        calls.accessories = options;
+        return { ok: true };
+      },
+      accessoryUpgradesForPlayer: async (_player, _profile, _budget, options) => {
+        calls.accessoryUpgrades = options;
+        return { ok: true };
+      },
+      readinessForPlayer: async (_area, _player, _profile, options) => {
+        calls.readiness = options;
+        return { ok: true };
+      },
+      planGoalForPlayer: async (_goal, _player, _profile, options) => {
+        calls.plan = options;
+        return { ok: true };
+      },
+      nextUpgradesForPlayer: async (_player, _profile, _budget, options) => {
+        calls.nextUpgrades = options;
+        return { ok: true };
+      },
+    } as any),
+  });
+
+  await gateway.handle(request("/networth?maxItems=12&timeoutMs=345&includeItems=false", "test-token"));
+  await gateway.handle(request("/item-networth?section=armor&maxItems=13&timeoutMs=456&includeItems=false", "test-token"));
+  await gateway.handle(request("/accessories?maxPriceLookups=14&timeoutMs=567", "test-token"));
+  await gateway.handle(request("/accessories/upgrades?budget=1000&maxPriceLookups=15&timeoutMs=678", "test-token"));
+  await gateway.handle(request("/readiness?area=dungeons:f7&budget=2000&maxItems=16&networthTimeoutMs=789&maxPriceLookups=17&accessoryTimeoutMs=890", "test-token"));
+  await gateway.handle(request("/plan?goal=f7&budget=3000&maxItems=18&networthTimeoutMs=901&maxPriceLookups=19&accessoryTimeoutMs=1200", "test-token"));
+  await gateway.handle(request("/next-upgrades?budget=4000&maxPriceLookups=20&accessoryTimeoutMs=1300", "test-token"));
+
+  expect(calls.networth).toMatchObject({ maxItems: 12, timeoutMs: 345, includeItems: false });
+  expect(calls.itemNetworth).toMatchObject({ maxItems: 13, timeoutMs: 456, includeItems: false });
+  expect(calls.accessories).toMatchObject({ maxPriceLookups: 14, timeoutMs: 567 });
+  expect(calls.accessoryUpgrades).toMatchObject({ maxPriceLookups: 15, timeoutMs: 678 });
+  expect(calls.readiness).toMatchObject({ budget: 2000, maxItems: 16, networthTimeoutMs: 789, maxPriceLookups: 17, accessoryTimeoutMs: 890 });
+  expect(calls.plan).toMatchObject({ budget: 3000, maxItems: 18, networthTimeoutMs: 901, maxPriceLookups: 19, accessoryTimeoutMs: 1200 });
+  expect(calls.nextUpgrades).toMatchObject({ maxPriceLookups: 20, accessoryTimeoutMs: 1300 });
+
+  const originalFetch = globalThis.fetch;
+  const urls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    urls.push(String(input));
+    return new Response(JSON.stringify({ ok: true, initMethod: init?.method ?? "GET" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+  try {
+    const client = new GatewayClient({ baseUrl: "http://127.0.0.1:1", token: "token" });
+    await client.networth("Notch", "Apple", { maxItems: 1, timeoutMs: 2 });
+    await client.itemNetworth("armor", "Notch", "Apple", { maxItems: 3, timeoutMs: 4, includeItems: false });
+    await client.accessories("Notch", "Apple", { maxPriceLookups: 5, timeoutMs: 6 });
+    await client.accessoryUpgrades(1000, "Notch", "Apple", { maxPriceLookups: 7, timeoutMs: 8 });
+    await client.readiness("dungeons:f7", "Notch", "Apple", { budget: 9, maxItems: 10, networthTimeoutMs: 11, maxPriceLookups: 12, accessoryTimeoutMs: 13 });
+    await client.plan("f7", "Notch", "Apple", 14, { maxItems: 15, networthTimeoutMs: 16, maxPriceLookups: 17, accessoryTimeoutMs: 18 });
+    await client.nextUpgrades(19, "Notch", "Apple", { maxPriceLookups: 20, accessoryTimeoutMs: 21 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  expect(urls.join("\n")).toContain("maxItems=1");
+  expect(urls.join("\n")).toContain("includeItems=false");
+  expect(urls.join("\n")).toContain("maxPriceLookups=5");
+  expect(urls.join("\n")).toContain("accessoryTimeoutMs=13");
+  expect(urls.join("\n")).toContain("networthTimeoutMs=16");
+  expect(urls.join("\n")).toContain("accessoryTimeoutMs=21");
 });
 
 test("config routes redact secrets and reject unknown keys", async () => {

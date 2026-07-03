@@ -285,6 +285,15 @@ Expected TUI behavior:
 - Profile selector, overview, debug, advanced sections, and future screens all use gateway APIs.
 - `skyagent tui --smoke` remains deterministic JSON for CI.
 
+## Cross-Surface Contracts
+
+`packages/core/src/surface-contracts.ts` is the compact inventory for high-value CLI, MCP, gateway, TUI, docs, and skill parity. Tests in the CLI, MCP, gateway, and TUI packages assert that startup/context, profile overview, inventory/items, networth, accessories, progression/readiness, planning/objectives, providers, server status, and context events remain mapped across the relevant surfaces.
+
+Intentional differences:
+- The TUI currently covers startup/context, profile overview, planning/objective controls, providers, server status, and context events through the agent, status, profiles, overview, debug, and advanced screens.
+- Dedicated rich TUI screens for inventory/items, networth, accessories, and progression/readiness remain tracked by #115 rather than implemented in the parity-test slice.
+- Compact defaults stay the default across surfaces; raw/debug payloads and bounded valuation options must remain explicit in each contract that can return large or valuation-heavy payloads.
+
 Expected web behavior:
 
 - `skyagent web start` ensures gateway and web server are available, stores process state, and opens a browser unless `--no-open` is provided.

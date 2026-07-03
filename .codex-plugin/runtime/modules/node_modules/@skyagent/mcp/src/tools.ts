@@ -525,6 +525,10 @@ export const tools = [
         player: { type: "string" },
         profile: { type: "string" },
         budget: { type: "number" },
+        maxItems: { type: "number" },
+        networthTimeoutMs: { type: "number" },
+        maxPriceLookups: { type: "number" },
+        accessoryTimeoutMs: { type: "number" },
       },
       required: ["area"],
       additionalProperties: false,
@@ -1019,11 +1023,21 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
     }
     case "skyblock_readiness": {
       const { readinessForPlayer } = await import("@skyagent/core/readiness");
-      if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
-        throw new Error("budget must be a non-negative finite number when provided.");
+        if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
+          throw new Error("budget must be a non-negative finite number when provided.");
+        }
+        finiteBound("maxItems", 0, true);
+        finiteBound("networthTimeoutMs", 1, true);
+        finiteBound("maxPriceLookups", 0, true);
+        finiteBound("accessoryTimeoutMs", 1, true);
+        return readinessForPlayer(args.area, args.player, args.profile, {
+          budget: args.budget ?? null,
+          maxItems: args.maxItems,
+          networthTimeoutMs: args.networthTimeoutMs,
+          maxPriceLookups: args.maxPriceLookups,
+          accessoryTimeoutMs: args.accessoryTimeoutMs,
+        });
       }
-      return readinessForPlayer(args.area, args.player, args.profile, { budget: args.budget ?? null });
-    }
     case "skyblock_plan_goal":
       if (args.budget !== undefined && (!Number.isFinite(args.budget) || args.budget < 0)) {
         throw new Error("budget must be a non-negative finite number when provided.");

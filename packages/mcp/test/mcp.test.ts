@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, expect, test } from "bun:test";
 import { contextEventBus } from "@skyagent/core/context-events";
 import { buildProfileSnapshot, writeProfileSnapshot } from "@skyagent/core/profile-cache";
+import { SURFACE_CONTRACTS, allContractCliCommands, allContractMcpTools } from "@skyagent/core/surface-contracts";
 import { callTool, tools } from "../src/tools.ts";
 
 const uuid = "3206bd83fa494a5e9a1cd165a2728597";
@@ -77,6 +78,57 @@ test("context MCP tools are exposed", () => {
   expect(names).toContain("skyagent_objective_delete");
 });
 
+test("MCP exposes every contract tool and skills reference existing tools", () => {
+  const names = new Set(tools.map((tool) => tool.name));
+  const documentedCliCommands = new Set([...allContractCliCommands(), "setup", "setup status"]);
+  for (const toolName of allContractMcpTools()) {
+    expect(names.has(toolName)).toBe(true);
+  }
+
+  const skillsDir = path.resolve(import.meta.dir, "../../../skills");
+  const skillFiles = fs.readdirSync(skillsDir)
+    .map((name) => path.join(skillsDir, name, "SKILL.md"))
+    .filter((file) => fs.existsSync(file));
+  const referencedTools = new Set<string>();
+  const referencedCliCommands = new Set<string>();
+  for (const file of skillFiles) {
+    const body = fs.readFileSync(file, "utf8");
+    for (const match of body.matchAll(/`((?:skyagent|skyblock|hypixel|minecraft)_[a-z0-9_]+)`/g)) {
+      referencedTools.add(match[1]);
+    }
+    for (const match of body.matchAll(/`skyagent ([^`\n]+)`/g)) {
+      referencedCliCommands.add(match[1].replace(/\s+--.*$/, "").trim());
+    }
+  }
+
+  for (const toolName of referencedTools) {
+    expect(names.has(toolName)).toBe(true);
+  }
+  for (const commandName of referencedCliCommands) {
+    expect(documentedCliCommands.has(commandName)).toBe(true);
+  }
+
+  const skillBodies = new Map<string, string>();
+  for (const skillName of new Set(SURFACE_CONTRACTS.flatMap((contract) => contract.skills))) {
+    const file = path.join(skillsDir, skillName, "SKILL.md");
+    expect(fs.existsSync(file)).toBe(true);
+    skillBodies.set(skillName, fs.readFileSync(file, "utf8"));
+  }
+
+  for (const contract of SURFACE_CONTRACTS) {
+    for (const skillName of contract.skills) {
+      const body = skillBodies.get(skillName) ?? "";
+      const referencesContractMcp = contract.mcp.some((toolName) => body.includes(`\`${toolName}\``));
+      const referencesContractCli = contract.cli.some((commandName) => body.includes(`\`skyagent ${commandName}`));
+      const documentsSkillFallback = contract.skills
+        .filter((fallbackSkill) => fallbackSkill !== skillName)
+        .some((fallbackSkill) => body.includes(`$${fallbackSkill}`));
+
+      expect(referencesContractMcp || referencesContractCli || documentsSkillFallback).toBe(true);
+    }
+  }
+});
+
 test("LLM provider MCP tools store redacted LiteLLM config", async () => {
   isolatedSkyAgentHome();
 
@@ -107,31 +159,24 @@ test("LLM provider MCP tools store redacted LiteLLM config", async () => {
 test("valuation-heavy MCP tools expose bounded agent controls", () => {
   const schemaFor = (name: string) => tools.find((tool) => tool.name === name)?.inputSchema.properties ?? {};
 
-  expect(schemaFor("skyblock_networth")).toMatchObject({
-    maxItems: { type: "number" },
-    timeoutMs: { type: "number" },
-    includeItems: { type: "boolean" },
-  });
-  expect(schemaFor("skyblock_item_networth")).toMatchObject({
-    maxItems: { type: "number" },
-    timeoutMs: { type: "number" },
-    includeItems: { type: "boolean" },
-  });
-  expect(schemaFor("skyblock_accessories")).toMatchObject({
-    maxPriceLookups: { type: "number" },
-    timeoutMs: { type: "number" },
-  });
-  expect(schemaFor("skyblock_missing_accessories")).toMatchObject({
-    maxPriceLookups: { type: "number" },
-    timeoutMs: { type: "number" },
-  });
-  expect(schemaFor("skyblock_accessory_upgrades")).toMatchObject({
-    maxPriceLookups: { type: "number" },
-    timeoutMs: { type: "number" },
-  });
+  for (const contract of SURFACE_CONTRACTS.filter((entry) => entry.boundedMcpOptions)) {
+    for (const [toolName, expectedOptions] of Object.entries(contract.boundedMcpOptions ?? {})) {
+      const properties = schemaFor(toolName);
+      for (const option of expectedOptions) {
+        expect(properties[option]).toBeDefined();
+      }
+    }
+  }
+  expect(schemaFor("skyblock_networth")).toMatchObject({ maxItems: { type: "number" }, timeoutMs: { type: "number" }, includeItems: { type: "boolean" } });
+  expect(schemaFor("skyblock_item_networth")).toMatchObject({ maxItems: { type: "number" }, timeoutMs: { type: "number" }, includeItems: { type: "boolean" } });
   expect(tools.find((tool) => tool.name === "skyblock_readiness")?.inputSchema).toMatchObject({
     properties: {
+      area: { type: "string" },
       budget: { type: "number" },
+      maxItems: { type: "number" },
+      networthTimeoutMs: { type: "number" },
+      maxPriceLookups: { type: "number" },
+      accessoryTimeoutMs: { type: "number" },
     },
   });
   expect(schemaFor("skyblock_plan_goal")).toMatchObject({

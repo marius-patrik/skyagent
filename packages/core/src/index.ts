@@ -21,4 +21,5 @@ export * from "./sections/index.ts";
 export * from "./setup.ts";
 export * from "./start.ts";
 export * from "./store.ts";
+export * from "./surface-contracts.ts";
 export * from "./weight.ts";

@@ -11,8 +11,10 @@ import {
   inventoryForPlayer,
   inventorySectionForPlayer,
   itemMetadata,
+  itemPrice,
   itemNetworthForPlayer,
   llmProviderStatus,
+  lowestBin,
   missingAccessoriesForPlayer,
   museumDonationPlanForPlayer,
   networthForPlayer,
@@ -24,6 +26,7 @@ import {
   progressionForPlayer,
   publicLlmProviderConfig,
   providerStatus,
+  coflnetPriceHistory,
   publicConfig,
   persistContextEvent,
   readContextEvents,
@@ -60,6 +63,9 @@ type GatewayDeps = {
   inventorySectionForPlayer: typeof inventorySectionForPlayer;
   normalizedItemsForPlayer: typeof normalizedItemsForPlayer;
   itemMetadata: typeof itemMetadata;
+  itemPrice: typeof itemPrice;
+  lowestBin: typeof lowestBin;
+  coflnetPriceHistory: typeof coflnetPriceHistory;
   networthForPlayer: typeof networthForPlayer;
   itemNetworthForPlayer: typeof itemNetworthForPlayer;
   llmProviderStatus: typeof llmProviderStatus;
@@ -118,6 +124,9 @@ const defaultDeps: GatewayDeps = {
   inventorySectionForPlayer,
   normalizedItemsForPlayer,
   itemMetadata,
+  itemPrice,
+  lowestBin,
+  coflnetPriceHistory,
   networthForPlayer,
   itemNetworthForPlayer,
   llmProviderStatus,
@@ -188,6 +197,81 @@ function numberQuery(url: URL, key: string) {
   if (value === undefined) return null;
   if (!value.trim()) return Number.NaN;
   return Number(value);
+}
+
+type QueryParseResult<T> = { value: T; error?: undefined } | { value?: undefined; error: Response };
+type BoundsParseResult<T extends Record<string, unknown>> = (T & { error?: undefined }) | { error: Response };
+
+function optionalPositiveIntegerQuery(url: URL, key: string): QueryParseResult<number | undefined> {
+  const value = numberQuery(url, key);
+  if (value === null) return { value: undefined };
+  if (!Number.isFinite(value) || value < 1 || !Number.isInteger(value)) {
+    return { error: errorResponse(400, `invalid_${key}`, `Query parameter ${key} must be a positive integer.`) };
+  }
+  return { value };
+}
+
+function optionalNonNegativeIntegerQuery(url: URL, key: string): QueryParseResult<number | undefined> {
+  const value = numberQuery(url, key);
+  if (value === null) return { value: undefined };
+  if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
+    return { error: errorResponse(400, `invalid_${key}`, `Query parameter ${key} must be a non-negative integer.`) };
+  }
+  return { value };
+}
+
+function optionalBooleanQuery(url: URL, key: string): QueryParseResult<boolean | undefined> {
+  const value = query(url, key);
+  if (value === undefined) return { value: undefined };
+  if (value === "true") return { value: true };
+  if (value === "false") return { value: false };
+  return { error: errorResponse(400, `invalid_${key}`, `Query parameter ${key} must be true or false.`) };
+}
+
+function valuationBounds(url: URL): BoundsParseResult<{ maxItems?: number; timeoutMs?: number; includeItems?: boolean }> {
+  const maxItems = optionalNonNegativeIntegerQuery(url, "maxItems");
+  if (maxItems.error) return { error: maxItems.error };
+  const timeoutMs = optionalPositiveIntegerQuery(url, "timeoutMs");
+  if (timeoutMs.error) return { error: timeoutMs.error };
+  const includeItems = optionalBooleanQuery(url, "includeItems");
+  if (includeItems.error) return { error: includeItems.error };
+  return { maxItems: maxItems.value, timeoutMs: timeoutMs.value, includeItems: includeItems.value };
+}
+
+function accessoryBounds(url: URL): BoundsParseResult<{ maxPriceLookups?: number; timeoutMs?: number }> {
+  const maxPriceLookups = optionalNonNegativeIntegerQuery(url, "maxPriceLookups");
+  if (maxPriceLookups.error) return { error: maxPriceLookups.error };
+  const timeoutMs = optionalPositiveIntegerQuery(url, "timeoutMs");
+  if (timeoutMs.error) return { error: timeoutMs.error };
+  return { maxPriceLookups: maxPriceLookups.value, timeoutMs: timeoutMs.value };
+}
+
+function nextUpgradeBounds(url: URL): BoundsParseResult<{ maxPriceLookups?: number; accessoryTimeoutMs?: number }> {
+  const maxPriceLookups = optionalNonNegativeIntegerQuery(url, "maxPriceLookups");
+  if (maxPriceLookups.error) return { error: maxPriceLookups.error };
+  const accessoryTimeoutMs = optionalPositiveIntegerQuery(url, "accessoryTimeoutMs");
+  if (accessoryTimeoutMs.error) return { error: accessoryTimeoutMs.error };
+  const timeoutMs: QueryParseResult<number | undefined> =
+    accessoryTimeoutMs.value === undefined ? optionalPositiveIntegerQuery(url, "timeoutMs") : { value: undefined };
+  if (timeoutMs.error) return { error: timeoutMs.error };
+  return { maxPriceLookups: maxPriceLookups.value, accessoryTimeoutMs: accessoryTimeoutMs.value ?? timeoutMs.value };
+}
+
+function readinessBounds(url: URL): BoundsParseResult<{ maxItems?: number; networthTimeoutMs?: number; maxPriceLookups?: number; accessoryTimeoutMs?: number }> {
+  const maxItems = optionalNonNegativeIntegerQuery(url, "maxItems");
+  if (maxItems.error) return { error: maxItems.error };
+  const networthTimeoutMs = optionalPositiveIntegerQuery(url, "networthTimeoutMs");
+  if (networthTimeoutMs.error) return { error: networthTimeoutMs.error };
+  const maxPriceLookups = optionalNonNegativeIntegerQuery(url, "maxPriceLookups");
+  if (maxPriceLookups.error) return { error: maxPriceLookups.error };
+  const accessoryTimeoutMs = optionalPositiveIntegerQuery(url, "accessoryTimeoutMs");
+  if (accessoryTimeoutMs.error) return { error: accessoryTimeoutMs.error };
+  return {
+    maxItems: maxItems.value,
+    networthTimeoutMs: networthTimeoutMs.value,
+    maxPriceLookups: maxPriceLookups.value,
+    accessoryTimeoutMs: accessoryTimeoutMs.value,
+  };
 }
 
 function sseEvent(event: any) {
@@ -402,31 +486,41 @@ export function createGateway(options: GatewayOptions = {}) {
 
       if (url.pathname === "/networth" && request.method === "GET") {
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, networth: await deps.networthForPlayer(player, profile) });
+        const bounds = valuationBounds(url);
+        if ("error" in bounds) return bounds.error;
+        return json({ ok: true, networth: await deps.networthForPlayer(player, profile, bounds) });
       }
 
       if (url.pathname === "/item-networth" && request.method === "GET") {
         const section = query(url, "section");
         if (!section) return errorResponse(400, "missing_section", "Query parameter section is required.");
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, itemNetworth: await deps.itemNetworthForPlayer(player, profile, section) });
+        const bounds = valuationBounds(url);
+        if ("error" in bounds) return bounds.error;
+        return json({ ok: true, itemNetworth: await deps.itemNetworthForPlayer(player, profile, section, bounds) });
       }
 
       if (url.pathname === "/accessories" && request.method === "GET") {
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, accessories: await deps.accessoriesForPlayer(player, profile) });
+        const bounds = accessoryBounds(url);
+        if ("error" in bounds) return bounds.error;
+        return json({ ok: true, accessories: await deps.accessoriesForPlayer(player, profile, bounds) });
       }
 
       if (url.pathname === "/accessories/missing" && request.method === "GET") {
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, missingAccessories: await deps.missingAccessoriesForPlayer(player, profile) });
+        const bounds = accessoryBounds(url);
+        if ("error" in bounds) return bounds.error;
+        return json({ ok: true, missingAccessories: await deps.missingAccessoriesForPlayer(player, profile, bounds) });
       }
 
       if (url.pathname === "/accessories/upgrades" && request.method === "GET") {
         const budget = numberQuery(url, "budget");
         if (budget === null || !Number.isFinite(budget) || budget < 0) return errorResponse(400, "invalid_budget", "Query parameter budget must be a non-negative number.");
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, upgrades: await deps.accessoryUpgradesForPlayer(player, profile, budget) });
+        const bounds = accessoryBounds(url);
+        if ("error" in bounds) return bounds.error;
+        return json({ ok: true, upgrades: await deps.accessoryUpgradesForPlayer(player, profile, budget, bounds) });
       }
 
       if (url.pathname === "/section" && request.method === "GET") {
@@ -445,7 +539,11 @@ export function createGateway(options: GatewayOptions = {}) {
         const area = query(url, "area");
         if (!area) return errorResponse(400, "missing_readiness_area", "Query parameter area is required.");
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, readiness: await deps.readinessForPlayer(area, player, profile) });
+        const budget = numberQuery(url, "budget");
+        if (budget !== null && (!Number.isFinite(budget) || budget < 0)) return errorResponse(400, "invalid_budget", "Query parameter budget must be a non-negative number.");
+        const bounds = readinessBounds(url);
+        if ("error" in bounds) return bounds.error;
+        return json({ ok: true, readiness: await deps.readinessForPlayer(area, player, profile, { ...bounds, budget }) });
       }
 
       if (url.pathname === "/weight" && request.method === "GET") {
@@ -458,8 +556,10 @@ export function createGateway(options: GatewayOptions = {}) {
         if (!goal) return errorResponse(400, "missing_goal", "Query parameter goal is required.");
         const budget = numberQuery(url, "budget");
         if (budget !== null && (!Number.isFinite(budget) || budget < 0)) return errorResponse(400, "invalid_budget", "Query parameter budget must be a non-negative number.");
+        const bounds = readinessBounds(url);
+        if ("error" in bounds) return bounds.error;
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, plan: await deps.planGoalForPlayer(goal, player, profile, { budget }) });
+        return json({ ok: true, plan: await deps.planGoalForPlayer(goal, player, profile, { budget, ...bounds }) });
       }
 
       if (url.pathname === "/museum/plan" && request.method === "GET") {
@@ -524,13 +624,33 @@ export function createGateway(options: GatewayOptions = {}) {
         const budget = numberQuery(url, "budget");
         if (budget === null || !Number.isFinite(budget) || budget < 0) return errorResponse(400, "invalid_budget", "Query parameter budget must be a non-negative number.");
         const [player, profile] = playerProfile(url);
-        return json({ ok: true, upgrades: await deps.nextUpgradesForPlayer(player, profile, budget) });
+        const bounds = nextUpgradeBounds(url);
+        if ("error" in bounds) return bounds.error;
+        return json({ ok: true, upgrades: await deps.nextUpgradesForPlayer(player, profile, budget, bounds) });
       }
 
       if (url.pathname === "/provider-status" && request.method === "GET") {
         const providers = deps.providerStatus();
         deps.emitProviderStatusEvent(providers);
         return json({ ok: true, providers });
+      }
+
+      if (url.pathname === "/price" && request.method === "GET") {
+        const itemId = query(url, "itemId") ?? query(url, "item");
+        if (!itemId) return errorResponse(400, "missing_item_id", "Query parameter itemId is required.");
+        return json({ ok: true, price: await deps.itemPrice(itemId) });
+      }
+
+      if (url.pathname === "/lbin" && request.method === "GET") {
+        const itemId = query(url, "itemId") ?? query(url, "item");
+        if (!itemId) return errorResponse(400, "missing_item_id", "Query parameter itemId is required.");
+        return json({ ok: true, lbin: await deps.lowestBin(itemId) });
+      }
+
+      if (url.pathname === "/price-history" && request.method === "GET") {
+        const itemId = query(url, "itemId") ?? query(url, "item");
+        if (!itemId) return errorResponse(400, "missing_item_id", "Query parameter itemId is required.");
+        return json({ ok: true, history: await deps.coflnetPriceHistory(itemId, query(url, "window") ?? undefined) });
       }
 
       if (url.pathname === "/llm-provider/status" && request.method === "GET") {
@@ -709,6 +829,8 @@ function queryPath(route: string, values: Record<string, string | number | boole
   return `${route}${params.size ? `?${params}` : ""}`;
 }
 
+type QueryValue = string | number | boolean | null | undefined;
+
 export class GatewayClient {
   baseUrl: string;
   token: string;
@@ -803,24 +925,24 @@ export class GatewayClient {
     return this.request(queryPath("/items/metadata", { id }));
   }
 
-  networth(player?: string, profile?: string) {
-    return this.request(queryPath("/networth", { player, profile }));
+  networth(player?: string, profile?: string, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/networth", { player, profile, ...options }));
   }
 
-  itemNetworth(section: string, player?: string, profile?: string) {
-    return this.request(queryPath("/item-networth", { section, player, profile }));
+  itemNetworth(section: string, player?: string, profile?: string, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/item-networth", { section, player, profile, ...options }));
   }
 
-  accessories(player?: string, profile?: string) {
-    return this.request(queryPath("/accessories", { player, profile }));
+  accessories(player?: string, profile?: string, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/accessories", { player, profile, ...options }));
   }
 
-  missingAccessories(player?: string, profile?: string) {
-    return this.request(queryPath("/accessories/missing", { player, profile }));
+  missingAccessories(player?: string, profile?: string, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/accessories/missing", { player, profile, ...options }));
   }
 
-  accessoryUpgrades(budget: number, player?: string, profile?: string) {
-    return this.request(queryPath("/accessories/upgrades", { budget, player, profile }));
+  accessoryUpgrades(budget: number, player?: string, profile?: string, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/accessories/upgrades", { budget, player, profile, ...options }));
   }
 
   section(name: string, player?: string, profile?: string) {
@@ -831,16 +953,16 @@ export class GatewayClient {
     return this.request(queryPath("/progression", { player, profile }));
   }
 
-  readiness(area: string, player?: string, profile?: string) {
-    return this.request(queryPath("/readiness", { area, player, profile }));
+  readiness(area: string, player?: string, profile?: string, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/readiness", { area, player, profile, ...options }));
   }
 
   weight(player?: string, profile?: string) {
     return this.request(queryPath("/weight", { player, profile }));
   }
 
-  plan(goal: string, player?: string, profile?: string, budget?: number | null) {
-    return this.request(queryPath("/plan", { goal, player, profile, budget }));
+  plan(goal: string, player?: string, profile?: string, budget?: number | null, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/plan", { goal, player, profile, budget, ...options }));
   }
 
   museumPlan(goal: string, player?: string, profile?: string, budget?: number | null, maxPriceLookups?: number | null, timeoutMs?: number | null, persistObjectives?: boolean | null) {
@@ -853,12 +975,24 @@ export class GatewayClient {
     return this.request(queryPath("/museum/plan", { goal, player, profile, budget, maxPriceLookups, timeoutMs }));
   }
 
-  nextUpgrades(budget: number, player?: string, profile?: string) {
-    return this.request(queryPath("/next-upgrades", { budget, player, profile }));
+  nextUpgrades(budget: number, player?: string, profile?: string, options: Record<string, QueryValue> = {}) {
+    return this.request(queryPath("/next-upgrades", { budget, player, profile, ...options }));
   }
 
   providerStatus() {
     return this.request("/provider-status");
+  }
+
+  price(itemId: string) {
+    return this.request(queryPath("/price", { itemId }));
+  }
+
+  lowestBin(itemId: string) {
+    return this.request(queryPath("/lbin", { itemId }));
+  }
+
+  priceHistory(itemId: string, window?: string | null) {
+    return this.request(queryPath("/price-history", { itemId, window }));
   }
 
   llmProviderStatus() {

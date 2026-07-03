@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "bun:test";
 import { stopGatewayProcess } from "@skyagent/gateway/manager";
+import { SURFACE_CONTRACTS } from "@skyagent/core/surface-contracts";
 import { activeObjectiveItems, agentConsumesPrintableInput, agentInputAction, agentRefreshShortcut, agentShouldAppendPrintableInput, applyAgentTranscriptDelta, connectTuiGateway, finishAgentTranscript, objectiveActionLabel, objectiveCursorAction, SkyAgentTuiApp, startAgentTranscript, tuiDegradedMessages, tuiSnapshot, tuiStatus } from "../src/index.tsx";
 
 let tempHome: string | null = null;
@@ -46,6 +47,13 @@ test("tui smoke snapshot exposes screens and does not print secrets", () => {
   expect(snapshot.shortcuts).toContain("x complete objective");
   expect(snapshot.secrets).toContain("never printed");
   expect(snapshot.renderer).toBe("ink");
+  expect(snapshot.contractCoverage.map((contract: any) => contract.id)).toEqual(SURFACE_CONTRACTS.map((contract) => contract.id));
+  expect(snapshot.trackedContractGaps.every((gap: any) => gap.issue === 115)).toBe(true);
+  for (const contract of snapshot.contractCoverage) {
+    for (const screen of contract.screens) {
+      expect(snapshot.screens as string[]).toContain(screen);
+    }
+  }
 });
 
 test("tui exports an Ink-backed React app surface", () => {

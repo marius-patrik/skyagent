@@ -35,8 +35,8 @@ function printLine(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
 }
 
-function usage() {
-  process.stdout.write(`SkyAgent CLI
+export function usageText() {
+  return `SkyAgent CLI
 
 Usage:
   skyagent config get [--show-key]
@@ -125,7 +125,11 @@ Usage:
 
 Secrets are read from HYPIXEL_API_KEY first, then the user config file.
 LLM provider secrets are read from SKYAGENT_LITELLM_API_KEY first, then the SkyAgent user config file.
-`);
+`;
+}
+
+function usage() {
+  process.stdout.write(usageText());
 }
 
 function kvPairs(args) {

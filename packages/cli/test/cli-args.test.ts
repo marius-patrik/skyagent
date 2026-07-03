@@ -6,8 +6,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { emitContextEvent } from "@skyagent/core/context-events";
 import { publicLlmProviderConfig } from "@skyagent/core/llm-provider";
 import { listObjectiveItems } from "@skyagent/core/objectives";
+import { SURFACE_CONTRACTS, allContractCliCommands } from "@skyagent/core/surface-contracts";
 import { stopGatewayProcess } from "@skyagent/gateway/manager";
-import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseMuseumPlanArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseReadinessArgs, parseSetupArgs, parseStartArgs } from "../src/index.ts";
+import { command, doctorStatus, parseAccessoryUpgradeArgs, parseContextArgs, parseGlobalOutputArgs, parseInventoryArgs, parseItemDumpArgs, parseItemNetworthArgs, parseMuseumPlanArgs, parseNextUpgradesArgs, parsePlanArgs, parseProfileSnapshotArgs, parseReadinessArgs, parseSetupArgs, parseStartArgs, usageText } from "../src/index.ts";
 import { installUpdate, parseUpdateArgs, updatePlan } from "../src/update.ts";
 
 let tempHome: string | null = null;
@@ -44,6 +45,17 @@ async function freePort() {
 }
 
 describe("CLI argument parsing", () => {
+  test("documents every contract CLI command in usage", () => {
+    const usage = usageText();
+
+    for (const commandName of allContractCliCommands()) {
+      expect(usage).toContain(`skyagent ${commandName}`);
+    }
+    for (const flag of new Set(SURFACE_CONTRACTS.flatMap((contract) => contract.cliFlags ?? []))) {
+      expect(usage).toContain(flag);
+    }
+  });
+
   test("global output flags are positional-safe", () => {
     expect(parseGlobalOutputArgs(["--json", "overview", "Notch", "Apple"])).toEqual({
       json: true,
