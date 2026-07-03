@@ -224,6 +224,196 @@ describe("planner", () => {
     });
   });
 
+  test("money goals return ranked route candidates with explicit requirements", async () => {
+    const result = await planGoalFromContext(context({
+      member: {
+        nether_island_player_data: { kuudra_completed_tiers: { 1: 1 }, kuudra_keys: { hot: 2 } },
+      },
+    }), "make money with 2m budget", {
+      budget: 2_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([]),
+      memories: [],
+      config: {},
+    });
+    const routes = result.recommendations.filter((entry) => entry.category === "route");
+    const moneyRoutes = routes.filter((entry) => entry.prerequisites[0]?.routeKind === "money");
+
+    expect(moneyRoutes.map((entry) => entry.id)).toEqual([
+      "money-route-bazaar-flips",
+      "money-route-garden-crops",
+      "money-route-dungeon-drops",
+      "money-route-kuudra-drops",
+    ]);
+    expect(moneyRoutes[0]).toMatchObject({
+      id: "money-route-bazaar-flips",
+      costEstimate: { coins: 2_000_000, status: "bounded_by_budget" },
+      prerequisites: [expect.objectContaining({
+        expectedOutputClass: "coins_from_market_spreads",
+        requirements: expect.arrayContaining([expect.objectContaining({ name: "price_provider_freshness" })]),
+        objectiveState: {
+          counts: { objective: 0, task: 0, buy: 0, source: 0, snipe: 0 },
+          activeCount: 0,
+          relevantActive: [],
+        },
+      })],
+    });
+    expect(result.todoCandidates).toContainEqual(expect.objectContaining({ recommendationId: "money-route-bazaar-flips" }));
+    expect(result.persistedObjectives).toBeNull();
+  });
+
+  test("farming goals compare crop and contest routes with missing data assumptions", async () => {
+    const result = await planGoalFromContext(context({ member: { garden_player_data: undefined } }), "farming jacob contest route", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([]),
+      memories: [],
+      config: {},
+    });
+    const cropRoute = result.recommendations.find((entry) => entry.id === "farming-route-crop-milestones");
+    const contestRoute = result.recommendations.find((entry) => entry.id === "farming-route-jacob-contests");
+
+    expect(cropRoute).toMatchObject({
+      category: "route",
+      prerequisites: [expect.objectContaining({
+        routeKind: "farming",
+        expectedOutputClass: "crop_milestones_and_farming_xp",
+      })],
+    });
+    expect(cropRoute?.warnings).toContainEqual(expect.objectContaining({ sourcePath: "member.garden_player_data" }));
+    expect(contestRoute).toMatchObject({
+      prerequisites: [expect.objectContaining({
+        expectedOutputClass: "medals_and_crop_collection",
+        missingUnlocks: expect.arrayContaining(["farming_25"]),
+      })],
+      warnings: expect.arrayContaining([expect.objectContaining({ code: "unsupported_exact_formula" })]),
+    });
+  });
+
+  test("farming crop routes start from lowest tracked crop alternatives", async () => {
+    const result = await planGoalFromContext(context({
+      member: {
+        garden_player_data: {
+          garden_experience: GARDEN_XP_THRESHOLDS[8],
+          crop_milestones: { wheat: 3, carrot: 1, potato: 7 },
+        },
+      },
+    }), "garden crop route", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([]),
+      memories: [],
+      config: {},
+    });
+    const cropRoute = result.recommendations.find((entry) => entry.id === "farming-route-crop-milestones");
+    const cropRequirement = cropRoute?.prerequisites[0].requirements.find((entry: any) => entry.name === "lowest_tracked_crop_milestones");
+
+    expect(cropRequirement.actual).toEqual([
+      { crop: "carrot", milestone: 1 },
+      { crop: "wheat", milestone: 3 },
+      { crop: "potato", milestone: 7 },
+    ]);
+  });
+
+  test("budget goals compare priced buys and unpriced source candidates", async () => {
+    const result = await planGoalFromContext(context(), "budget accessory upgrade route", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([unknownPriceUpgrade, upgrade]),
+      memories: [],
+      config: {},
+      objectives: {
+        counts: { objective: 1, buy: 1 },
+        active: [{ id: "obj-1", itemKind: "buy", title: "Accessory upgrade route", status: "active", itemId: "CHEAP_TALISMAN", priority: 80 }],
+      },
+    });
+    const budgetRoute = result.recommendations.find((entry) => entry.id === "budget-route-upgrade-source");
+    const requirements = budgetRoute?.prerequisites[0].requirements ?? [];
+
+    expect(budgetRoute).toMatchObject({
+      category: "route",
+      costEstimate: { coins: 800_000, budget: 1_000_000, status: "estimated_from_candidates" },
+      prerequisites: [expect.objectContaining({
+        routeKind: "budget_upgrade_source",
+        expectedOutputClass: "magical_power_and_item_acquisition",
+        missingUnlocks: ["price:UNKNOWN_PRICE_TALISMAN"],
+        objectiveState: expect.objectContaining({
+          counts: { objective: 1, buy: 1 },
+          activeCount: 1,
+          relevantActive: [expect.objectContaining({ id: "obj-1", itemId: "CHEAP_TALISMAN" })],
+        }),
+      })],
+      warnings: expect.arrayContaining([expect.objectContaining({ code: "unpriced_source_candidates" })]),
+    });
+    expect(requirements.find((entry: any) => entry.name === "priced_upgrade_candidates").actual).toContainEqual(expect.objectContaining({ itemId: "CHEAP_TALISMAN", withinBudget: true }));
+    expect(requirements.find((entry: any) => entry.name === "source_only_candidates").actual).toContainEqual(expect.objectContaining({ itemId: "UNKNOWN_PRICE_TALISMAN" }));
+    expect(result.buyListCandidates).toContainEqual(expect.objectContaining({ itemId: "CHEAP_TALISMAN" }));
+    expect(result.sourceItemCandidates).toContainEqual(expect.objectContaining({ itemId: "UNKNOWN_PRICE_TALISMAN" }));
+  });
+
+  test("budget upgrade/source route is not emitted for unrelated goals", async () => {
+    const result = await planGoalFromContext(context(), "f7 dungeon route", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([unknownPriceUpgrade, upgrade]),
+      memories: [],
+      config: {},
+    });
+
+    expect(result.recommendations).not.toContainEqual(expect.objectContaining({ id: "budget-route-upgrade-source" }));
+    expect(result.sourceItemCandidates).toEqual([]);
+  });
+
+  test("dungeon and Kuudra goals include target-aware route prerequisites", async () => {
+    const dungeon = await planGoalFromContext(context(), "route f7 dungeon", {
+      budget: 1_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([]),
+      memories: [],
+      config: {},
+    });
+    const dungeonRoute = dungeon.recommendations.find((entry) => entry.id === "dungeon-route-target-floor");
+
+    expect(dungeonRoute).toMatchObject({
+      title: "Route Dungeon target Floor 7",
+      prerequisites: [expect.objectContaining({
+        routeKind: "dungeon",
+        expectedOutputClass: "floor_completion_and_combat_drops",
+        requirements: expect.arrayContaining([
+          expect.objectContaining({ name: "catacombs_level", target: 24 }),
+          expect.objectContaining({ name: "readiness_blockers" }),
+        ]),
+        missingUnlocks: expect.arrayContaining(["catacombs_level"]),
+      })],
+    });
+
+    const kuudra = await planGoalFromContext(context({
+      member: {
+        nether_island_player_data: { kuudra_completed_tiers: { 1: 1 }, kuudra_keys: { basic: 1 } },
+      },
+    }), "burning kuudra route", {
+      budget: 5_000_000,
+      networthProvider: networth,
+      accessoriesProvider: () => accessories([]),
+      memories: [],
+      config: {},
+    });
+    const kuudraRoute = kuudra.recommendations.find((entry) => entry.id === "kuudra-route-target-tier");
+
+    expect(kuudraRoute).toMatchObject({
+      title: "Route Kuudra target burning Kuudra",
+      prerequisites: [expect.objectContaining({
+        routeKind: "kuudra",
+        expectedOutputClass: "kuudra_tier_progress_and_chest_value",
+        requirements: expect.arrayContaining([
+          expect.objectContaining({ name: "completed_tiers" }),
+          expect.objectContaining({ name: "readiness_blockers" }),
+        ]),
+        missingUnlocks: expect.arrayContaining(["combat_level"]),
+      })],
+    });
+  });
+
   test("updates an existing objective root when requested", async () => {
     isolatedSkyAgentHome();
     const root = createObjectiveItem({ itemKind: "objective", title: "Old F7", status: "open" });
