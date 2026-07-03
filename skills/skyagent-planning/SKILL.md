@@ -13,7 +13,8 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 
 ## Tool Routing
 
-- Use `skyblock_plan_goal` for goal-specific plans, blockers, daily/weekly routes, prerequisites, immediate actions, todo candidates, buy-list candidates, source-item candidates, snipe targets, and what to skip. Set `useContext: true` for broad planning so cached profile/objective state is included before pulling raw details.
+- Use `skyblock_plan_goal` for goal-specific plans, blockers, daily/weekly routes, route candidates, prerequisites, immediate actions, todo candidates, buy-list candidates, source-item candidates, snipe targets, and what to skip. Set `useContext: true` for broad planning so cached profile/objective state is included before pulling raw details.
+- For money, farming/Garden, Dungeon/Floor, Kuudra, and budgeted upgrade/source goals, preserve the planner's ranked route candidates. Their prerequisites include `routeKind`, `expectedOutputClass`, requirements, missing unlocks/blockers, budget/cost state, source freshness, uncertainty, and warnings.
 - Use `skyblock_museum_donation_plan` for Museum donation goals before generic planning. It returns already-donated, eligible-owned, hidden-owned, missing, uncertain, buy, source, and snipe candidates with bounded price warnings and storage evidence.
 - Include `budget` when the user gives coins available.
 - Use `skyblock_next_upgrades` for purchase ranking before recommending buys.
@@ -34,6 +35,7 @@ Use this skill when the user has a concrete goal, asks what to do next, wants an
 - Put immediate actions first, then medium-term route.
 - Say what to skip when the planner output includes skip guidance.
 - Do not recommend a buyable upgrade without budget and price evidence.
+- Do not claim exact money-route profit rates, Jacob medal thresholds, Dungeon drop value, or Kuudra chest value unless a maintained current provider/source is attached. Report output class and uncertainty instead.
 - When the user accepts a route, persist it as objective/task entries; persist purchase candidates as `buy` entries and auction watch rules as `snipe` entries with `itemId`, `targetPrice`, `budget`, `priority`, source provider, freshness, and warnings. Do not create or update objective records during preview-only planning.
 - Keep profile, economy, progression, readiness, and external meta assumptions visible in the final plan.
 - Re-read recent context events before revising an in-progress objective so the user does not have to restate progress already captured by the context stream.

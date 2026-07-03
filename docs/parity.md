@@ -20,7 +20,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 - Accessory bag analysis with duplicate detection, recombobulation/enrichment signals, estimated Magical Power, missing accessories when metadata is available, and price-driven coin-per-MP upgrade ranking.
 - Shared progression section framework with skill, Catacombs, Slayer XP curves plus sections for skills, Dungeons, Slayer, Mining/HotM, Garden, Bestiary, Collections, Minions, Museum, Crimson Isle/Kuudra, Rift, Trophy Fishing, Pets, Essence, currencies, and unlocks. Outputs include source fields, missing-data warnings, formulas/tables, and provenance.
 - Weight and readiness estimators for broad profile comparison and dungeons, Slayer, Kuudra, Garden, and Mining readiness. Exact Senither/Lily formulas are explicitly marked unsupported until maintained formula tables are bundled.
-- Deterministic goal planner and next-upgrade output that compose networth, accessory upgrades, readiness, memories/config context, source freshness, assumptions, and warnings.
+- Deterministic goal planner and next-upgrade output that compose networth, accessory upgrades, readiness, memories/config context, source freshness, assumptions, warnings, and route candidates for money, farming/Garden, Dungeon, Kuudra, and budgeted upgrade/source goals.
 - Recommendation-grade pet and wardrobe/loadout normalization for agent context: pets expose stable type, tier, XP, active state, held item, skin, candy count, source path, and explicit missing level-formula warnings; wardrobe output distinguishes true wardrobe contents from loadout armor fallback with loadout slot, armor slot, current/unknown state, partial-loadout warnings, and source metadata.
 
 ## Missing for SkyCrypt-Style Parity
@@ -32,7 +32,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 - Full profile-viewer depth inside each progression section, including detailed SkyCrypt-grade UI breakdowns, per-floor dungeon badges, exact Garden milestone tables, full Museum item valuation, and richer Crimson Isle/Rift objective readiness.
 - Exact Senither/Lily weight parity and maintained reference-formula synchronization.
 - Full DPS simulation, party-finder acceptance modeling, and maintained volatile meta thresholds for specific Slayer bosses/tiers, Dungeon floors, Kuudra tiers, and damage goals.
-- Deep goal-specific route optimization with exact gear, pet, class, party-finder, money route, farming crop, and time-to-complete models.
+- Deep goal-specific route optimization with exact gear, pet, class, party-finder, profit-rate, farming crop, and time-to-complete models. SkyAgent has conservative route modules for money, farming, Dungeon, and Kuudra, but exact optimization and current meta thresholds remain unsupported without maintained providers.
 - Historical price sources and full lowest-BIN search beyond bounded auction-page scans.
 
 ## Current Networth Limits
@@ -63,6 +63,6 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 1. Expand compact startup context with hidden storage, Museum, sacks, coop, and availability signals.
 2. Deepen Museum donation planning with maintained donatable item metadata, XP/value tiers, and special-case eligibility.
 3. Deepen target-aware readiness with maintained meta thresholds and route-specific alternatives beyond the current gear, pet, accessory, modifier, and budget blocker checks.
-4. Add route-specific planner modules for money, farming, Dungeon, Kuudra, buy, source, and snipe planning.
+4. Deepen route-specific planner modules with maintained profit/time models, crop/contest formulas, and richer source/snipe routing.
 5. Deepen provider metadata for pet levels, skins, dyes, Museum eligibility/value, accessory families, item modifiers, and price confidence.
 6. Add cross-surface parity tests so CLI, MCP, gateway, TUI, docs, and skills stay aligned.

@@ -156,6 +156,7 @@ function assertRuntimePayload() {
     }
   }
   assertRuntimeContextSurface();
+  assertRuntimePlannerRouteSurface();
 }
 
 function assertRuntimeContextSurface() {
@@ -213,6 +214,54 @@ function assertRuntimeContextSurface() {
   const output = runWithOutput(["bun", "-e", probe]);
   if (!output.includes('"ok":true')) {
     fail("prepared runtime context probe did not report ok");
+  }
+}
+
+function assertRuntimePlannerRouteSurface() {
+  const probe = `
+    const mod = await import("./.codex-plugin/runtime/modules/node_modules/@skyagent/core/src/planner.ts");
+    const context = {
+      uuid: "uuid",
+      profile: { profile_id: "profile", cute_name: "Apple" },
+      member: {},
+      rateLimit: null,
+    };
+    const progression = {
+      sections: [
+        { section: "skills", computed: { skills: [{ name: "farming", level: 20 }] }, warnings: [], provenance: { formulas: [] } },
+        { section: "garden", computed: { gardenLevel: { level: 4 }, cropMilestones: { wheat: 3, carrot: 1 }, visitorStats: {} }, warnings: [], provenance: { formulas: [] } },
+        { section: "dungeons", computed: { catacombs: { level: 18 }, classes: { mage: { level: 16 } }, dungeonTypes: { catacombs: { tierCompletions: { 5: 1 } } } }, warnings: [], provenance: { formulas: [] } },
+        { section: "crimson_isle", computed: { kuudra: { completions: { 1: 1 }, keys: { basic: 1 } }, dojo: {}, abiphone: {} }, warnings: [], provenance: { formulas: [] } },
+        { section: "currencies", computed: { purse: 2_000_000 }, warnings: [], provenance: { formulas: [] } },
+        { section: "unlocks", computed: {}, warnings: [], provenance: { formulas: [] } },
+      ],
+    };
+    const commonOptions = {
+      budget: 1_000_000,
+      networthProvider: () => ({ total: 2_000_000, providerFreshness: [{ source: "probe-price" }], warnings: [] }),
+      accessoriesProvider: () => ({ upgrades: [
+        { internalId: "CHEAP_TALISMAN", displayName: "Cheap Talisman", price: 800_000, magicalPowerGain: 8, coinPerMagicalPower: 100_000, withinBudget: true, provider: { source: "probe-price" }, warnings: [] },
+        { internalId: "UNPRICED_TALISMAN", displayName: "Unpriced Talisman", price: null, magicalPowerGain: 4, provider: { source: "probe-price" }, warnings: [] },
+      ], providerFreshness: [{ source: "probe-accessories" }], warnings: [] }),
+      progressionProvider: () => progression,
+      memories: [],
+      config: {},
+      objectives: { counts: { objective: 1 }, active: [{ id: "obj-1", itemKind: "buy", title: "Accessory upgrade route", itemId: "CHEAP_TALISMAN", status: "active" }] },
+    };
+    const budgetPlan = await mod.planGoalFromContext(context, "budget accessory upgrade route", commonOptions);
+    const budgetRoute = budgetPlan.recommendations.find((entry) => entry.id === "budget-route-upgrade-source");
+    if (!budgetRoute) throw new Error("missing generated runtime budget route");
+    if (!budgetRoute.prerequisites?.[0]?.objectiveState?.relevantActive?.length) throw new Error("missing generated runtime objective state");
+    if (!budgetPlan.sourceItemCandidates.some((entry) => entry.itemId === "UNPRICED_TALISMAN")) throw new Error("missing generated runtime source candidate");
+    const moneyPlan = await mod.planGoalFromContext(context, "make money", commonOptions);
+    if (!moneyPlan.recommendations.some((entry) => entry.id === "money-route-bazaar-flips")) throw new Error("missing generated runtime money route");
+    const unrelated = await mod.planGoalFromContext(context, "f7 dungeon route", commonOptions);
+    if (unrelated.recommendations.some((entry) => entry.id === "budget-route-upgrade-source")) throw new Error("generated runtime emitted budget route for unrelated goal");
+    console.log(JSON.stringify({ ok: true, routes: budgetPlan.recommendations.filter((entry) => entry.category === "route").map((entry) => entry.id).slice(0, 5) }));
+  `;
+  const output = runWithOutput(["bun", "-e", probe]);
+  if (!output.includes('"ok":true')) {
+    fail("prepared runtime planner route probe did not report ok");
   }
 }
 
