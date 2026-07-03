@@ -31,7 +31,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 - Full SkyCrypt/SkyHelper-grade Museum donation planning for every special case and maintained donatable item table. SkyAgent now has conservative owned/hidden/missing candidate routing, but unsupported eligibility/value cases remain warning-backed.
 - Full profile-viewer depth inside each progression section, including detailed SkyCrypt-grade UI breakdowns, per-floor dungeon badges, exact Garden milestone tables, full Museum item valuation, and richer Crimson Isle/Rift objective readiness.
 - Exact Senither/Lily weight parity and maintained reference-formula synchronization.
-- Gear-aware target readiness for specific Slayer bosses/tiers, Dungeon floors, Kuudra tiers, and damage goals.
+- Full DPS simulation, party-finder acceptance modeling, and maintained volatile meta thresholds for specific Slayer bosses/tiers, Dungeon floors, Kuudra tiers, and damage goals.
 - Deep goal-specific route optimization with exact gear, pet, class, party-finder, money route, farming crop, and time-to-complete models.
 - Historical price sources and full lowest-BIN search beyond bounded auction-page scans.
 
@@ -40,7 +40,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 - Direct item IDs are valued through the price provider layer; unresolved prices are listed under `unknownPrices` and excluded from totals.
 - Purse and bank are included.
 - Inventory sections are separated for armor, equipment, wardrobe, inventory, ender chest, backpacks, accessory bag, personal vault, and pets when exposed by the Hypixel profile payload.
-- Item modifiers, pet levels, skins, dyes, attributes, enchantments, gemstones, recombobulation, and museum state are preserved as assumptions/context but are not independently valued yet.
+- Item modifiers, pet levels, skins, dyes, attributes, enchantments, gemstones, recombobulation, and museum state are preserved as assumptions/context; combat readiness consumes gear/modifier presence as blockers, but these fields are not independently valued yet.
 - Pet XP is preserved, but exact pet level is not derived until a maintained pet XP formula/provider is bundled. Pet networth, pet score, and skin valuation are not claimed as SkyCrypt/SkyHelper parity.
 - Results include provider freshness and confidence metadata and should be treated as estimates, not authoritative SkyCrypt/SkyHelper replacements.
 
@@ -62,7 +62,7 @@ For the current 2.0 public-readiness gap map and owning issues, see `docs/public
 
 1. Expand compact startup context with hidden storage, Museum, sacks, coop, and availability signals.
 2. Deepen Museum donation planning with maintained donatable item metadata, XP/value tiers, and special-case eligibility.
-3. Upgrade readiness into target-aware gear, pet, accessory, modifier, and budget checks.
+3. Deepen target-aware readiness with maintained meta thresholds and route-specific alternatives beyond the current gear, pet, accessory, modifier, and budget blocker checks.
 4. Add route-specific planner modules for money, farming, Dungeon, Kuudra, buy, source, and snipe planning.
 5. Deepen provider metadata for pet levels, skins, dyes, Museum eligibility/value, accessory families, item modifiers, and price confidence.
 6. Add cross-surface parity tests so CLI, MCP, gateway, TUI, docs, and skills stay aligned.

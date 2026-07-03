@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, test } from "bun:test";
+import nbt from "prismarine-nbt";
 import { CATACOMBS_XP_THRESHOLDS, GARDEN_XP_THRESHOLDS, HOTM_XP_THRESHOLDS, SKILL_XP_THRESHOLDS, createObjectiveItem, listObjectiveItems, nextUpgradesFromContext, planGoalFromContext } from "../src/index.ts";
 
 let tempHome: string | null = null;
@@ -17,6 +19,28 @@ afterEach(() => {
 function isolatedSkyAgentHome() {
   tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-planner-test-"));
   process.env.SKYAGENT_HOME = tempHome;
+}
+
+function item(slot: number, internalId: string, displayName = internalId, extra: Record<string, any> = {}) {
+  const extraValue: Record<string, any> = { id: { type: "string", value: internalId } };
+  for (const [key, value] of Object.entries(extra)) {
+    extraValue[key] = typeof value === "number" ? { type: "int", value } : { type: "string", value: String(value) };
+  }
+  return {
+    Slot: { type: "byte", value: slot },
+    id: { type: "string", value: "minecraft:stone" },
+    Count: { type: "byte", value: 1 },
+    Damage: { type: "short", value: 0 },
+    tag: { type: "compound", value: { display: { type: "compound", value: { Name: { type: "string", value: displayName } } }, ExtraAttributes: { type: "compound", value: extraValue } } },
+  };
+}
+
+function payload(items: any[]) {
+  return gzipSync(nbt.writeUncompressed({
+    type: "compound",
+    name: "",
+    value: { i: { type: "list", value: { type: "compound", value: items } } },
+  } as any)).toString("base64");
 }
 
 function context(overrides: any = {}) {
@@ -44,6 +68,18 @@ function context(overrides: any = {}) {
       slayer: { slayer_bosses: { zombie: { xp: 5_000 } } },
       mining_core: { experience: HOTM_XP_THRESHOLDS[4], nodes: {} },
       garden_player_data: { garden_experience: GARDEN_XP_THRESHOLDS[4], crop_milestones: { wheat: 3 } },
+      accessory_bag_storage: { highest_magical_power: 90 },
+      pets_data: { pets: [{ type: "SHEEP", tier: "EPIC", active: true }] },
+      inventory: {
+        inv_contents: { data: payload([item(0, "ASPECT_OF_THE_END", "Aspect of the End", { modifier: "warped", hot_potato_count: 10 })]) },
+        inv_armor: { data: payload([
+          item(0, "WISE_DRAGON_HELMET", "Wise Dragon Helmet", { modifier: "necrotic" }),
+          item(1, "WISE_DRAGON_CHESTPLATE", "Wise Dragon Chestplate", { modifier: "necrotic" }),
+          item(2, "WISE_DRAGON_LEGGINGS", "Wise Dragon Leggings", { modifier: "necrotic" }),
+          item(3, "WISE_DRAGON_BOOTS", "Wise Dragon Boots", { modifier: "necrotic" }),
+        ]) },
+        bag_contents: { talisman_bag: { data: payload([item(0, "CHEAP_TALISMAN", "Cheap Talisman")]) } },
+      },
       ...overrides.member,
     },
     rateLimit: null,
@@ -122,7 +158,28 @@ describe("planner", () => {
     expect(first.recommendations[0]).toMatchObject({ id: "accessory-CHEAP_TALISMAN", category: "upgrade" });
     expect(first.recommendations.some((entry) => entry.category === "memory_context")).toBe(true);
     expect(first.recommendations.some((entry) => entry.id === "goal-route")).toBe(true);
-    expect(first.recommendations.some((entry) => entry.id === "dungeons-catacombs_24")).toBe(true);
+    expect(first.recommendations.some((entry) => entry.id === "dungeons-catacombs_level")).toBe(true);
+    expect(first.recommendations.some((entry) => entry.reason.includes("Readiness blocker catacombs_level"))).toBe(true);
+    const readinessRecommendation = first.recommendations.find((entry) => entry.id === "dungeons-catacombs_level");
+    expect(readinessRecommendation?.prerequisites[0].followUpRoute).toMatchObject({
+      area: "dungeons",
+      check: "catacombs_level",
+      blocker: "catacombs_level",
+      sourceField: "member.dungeons.dungeon_types.catacombs.experience",
+      followUpTool: "skyblock_profile_section",
+    });
+    expect(first.inputs.readiness[0].blockers[0]).toMatchObject({
+      area: "dungeons",
+      check: "catacombs_level",
+      followUpTool: "skyblock_profile_section",
+    });
+    expect(first.inputs.readiness[0].followUpTools).toContain("skyblock_profile_section");
+    expect(first.inputs.readinessFollowUpRoutes[0]).toMatchObject({ area: "dungeons", check: "catacombs_level" });
+    expect(first.inputs.readiness[0].readinessContext.gear.armor.itemCount).toBe(4);
+    expect(first.inputs.readiness[0].readinessContext.providerFreshness).toEqual([
+      { source: "test-price", fetchedAt: "2026-07-01T00:00:00.000Z", providerKind: "networth" },
+      { source: "test-accessories", fetchedAt: "2026-07-01T00:00:00.000Z", providerKind: "accessories" },
+    ]);
     expect(first.whatToSkip[0]).toMatchObject({ id: "skip-low-impact-detours" });
     expect(first.skipGuidance[0]).toMatchObject({ id: "skip-low-impact-detours" });
     expect(first.immediateActions[0]).toMatchObject({ kind: "task", recommendationId: "accessory-CHEAP_TALISMAN" });

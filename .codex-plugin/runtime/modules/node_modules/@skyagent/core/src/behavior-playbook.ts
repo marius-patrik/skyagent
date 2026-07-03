@@ -166,7 +166,7 @@ export function skyAgentBehaviorRoute(intent: SkyAgentBehaviorIntent): SkyAgentB
         {
           id: "readiness",
           tool: "skyblock_readiness:slayer",
-          reason: "Get current Slayer readiness and explicit missing-data assumptions.",
+          reason: "Get current Slayer readiness, failed-check blocker fields, readinessContext, and explicit missing-data assumptions.",
           required: true,
           compact: true,
           fallback: ["skyblock_progression:slayer", "skyblock_profile_overview"],
@@ -198,7 +198,7 @@ export function skyAgentBehaviorRoute(intent: SkyAgentBehaviorIntent): SkyAgentB
         {
           id: "budget_prices",
           tool: "skyblock_next_upgrades",
-          reason: "Rank only budgeted upgrades with price evidence before recommending purchases.",
+          reason: "Rank only budgeted upgrades with price evidence after readiness blocker routing before recommending purchases.",
           required: true,
           compact: true,
           fallback: ["skyblock_price", "skyblock_lowest_bin", "skip purchases without price evidence"],
