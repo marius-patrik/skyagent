@@ -2,8 +2,6 @@ name: Codex Review
 
 on:
   pull_request_target:
-    branches:
-      - main
     types:
       - opened
       - synchronize
@@ -28,7 +26,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build Codex review image
-        run: docker build -f .github/codex-review.Dockerfile -t skyagent-codex-review .
+        run: docker build -f .github/codex-review.Dockerfile -t darkfactory-codex-review .
 
       - name: Checkout PR head
         uses: actions/checkout@v4
@@ -47,11 +45,31 @@ jobs:
             const contextDir = "review-context";
             fs.mkdirSync(contextDir, { recursive: true });
 
-            const agentsPath = path.join(".agents", "AGENTS.md");
-            const agents = fs.existsSync(agentsPath)
-              ? fs.readFileSync(agentsPath, "utf8")
-              : "No .agents/AGENTS.md file was found in the base branch checkout.";
-            fs.writeFileSync(path.join(contextDir, "AGENTS.md"), agents);
+            const contextFiles = [
+              "AGENTS.md",
+              ".agents/AGENTS.md",
+              ".agents/.global/AGENT_PROTOCOL.md",
+              ".agents/.global/WORKFLOW.md",
+              ".agents/.global/VALIDATION.md",
+              ".agents/.global/DOCS_AND_MEMORY.md",
+              ".agents/.project/AGENTS.md",
+              ".agents/.project/PROJECT.md",
+              ".agents/.project/COMMANDS.md",
+              ".agents/.project/STATUS.md",
+              ".agents/.project/HANDOFF.md",
+            ];
+            const agentSections = [];
+            for (const file of contextFiles) {
+              if (fs.existsSync(file)) {
+                agentSections.push([`# ${file}`, "", fs.readFileSync(file, "utf8")].join("\n"));
+              }
+            }
+            fs.writeFileSync(
+              path.join(contextDir, "AGENTS.md"),
+              agentSections.length
+                ? agentSections.join("\n\n---\n\n")
+                : "No managed agent context files were found in the base branch checkout.",
+            );
 
             const body = context.payload.pull_request?.body ?? "";
             const issueNumbers = Array.from(
@@ -84,6 +102,7 @@ jobs:
           CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
           CODEX_REVIEW_MODEL: gpt-5.5
           CODEX_REVIEW_EFFORT: low
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         shell: bash
@@ -110,7 +129,8 @@ jobs:
           docker run --rm \
             -e CODEX_HOME=/codex-home \
             -e HOME=/codex-home \
-            -e BASE_REF=origin/main \
+            -e BASE_BRANCH \
+            -e BASE_REF=origin/${BASE_BRANCH} \
             -e REVIEW_OUTPUT=codex-review.json \
             -e CODEX_REVIEW_MODEL \
             -e CODEX_REVIEW_EFFORT \
@@ -120,7 +140,7 @@ jobs:
             -v "${PWD}/pr-workspace:/workspace" \
             -v "${PWD}/review-context:/review-context:ro" \
             -v "${CODEX_HOME_DIR}:/codex-home" \
-            skyagent-codex-review
+            darkfactory-codex-review
 
           cp pr-workspace/codex-review.json codex-review.json
 
@@ -131,7 +151,7 @@ jobs:
           script: |
             const fs = require("fs");
             const review = JSON.parse(fs.readFileSync("codex-review.json", "utf8"));
-            const marker = "<!-- skyagent-codex-review -->";
+            const marker = "<!-- darkfactory-codex-review -->";
             const blocking = review.blocking_findings.length
               ? review.blocking_findings.map((item) => `- ${item}`).join("\n")
               : "- None";

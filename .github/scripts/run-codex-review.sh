@@ -3,6 +3,7 @@ set -euo pipefail
 
 REVIEW_OUTPUT="${REVIEW_OUTPUT:-codex-review.json}"
 BASE_REF="${BASE_REF:-origin/main}"
+BASE_BRANCH="${BASE_BRANCH:-main}"
 CODEX_HOME="${CODEX_HOME:-/tmp/codex-home}"
 SCHEMA_PATH="${SCHEMA_PATH:-/opt/codex-review/schema.json}"
 REVIEW_CONTEXT_DIR="${REVIEW_CONTEXT_DIR:-/review-context}"
@@ -48,7 +49,7 @@ if [ ! -s "${CODEX_HOME}/auth.json" ]; then
 fi
 
 git config --global --add safe.directory /workspace
-git fetch origin main
+git fetch origin "${BASE_BRANCH}"
 
 AGENTS_CONTEXT="${REVIEW_CONTEXT_DIR}/AGENTS.md"
 ISSUE_CONTEXT="${REVIEW_CONTEXT_DIR}/linked-issues.md"
@@ -70,6 +71,10 @@ PROMPT_FILE="$(mktemp)"
 PR_BODY_FILE="$(mktemp)"
 printf '%s\n' "${PR_BODY}" > "${PR_BODY_FILE}"
 DIFF_EXCLUDES=(
+  ':!dist/**'
+  ':!build/**'
+  ':!coverage/**'
+  ':!node_modules/**'
   ':!packages/web/dist/**'
   ':!.codex-plugin/runtime/modules/**'
 )
@@ -79,11 +84,11 @@ git diff --find-renames "${BASE_REF}...HEAD" -- . "${DIFF_EXCLUDES[@]}" >> "${DI
 
 {
 cat <<EOF
-You are reviewing a pull request for the SkyAgent repository.
+You are reviewing a pull request for a DarkFactory-managed repository.
 
-Review the PR against the linked issue/spec, the repository rules in .agents/AGENTS.md, and the diff below.
+Review the PR against the linked issue/spec, the managed repository agent context, and the diff below.
 
-The generated review diff intentionally excludes packages/web/dist/** and .codex-plugin/runtime/modules/**. Review the generator and validation logic for those generated files instead; CI must validate generated payloads directly.
+The generated review diff intentionally excludes common generated output directories such as dist/**, build/**, coverage/**, node_modules/**, packages/web/dist/**, and .codex-plugin/runtime/modules/**. Review source generators and validation logic for generated payloads instead; CI must validate generated payloads directly.
 
 Return only JSON that matches the provided schema.
 
@@ -104,10 +109,10 @@ append_capped_file "${PR_BODY_FILE}" "PR body" 40000
 
 cat <<EOF
 
-Repository rules from .agents/AGENTS.md:
+Managed repository agent context:
 EOF
 
-append_capped_file "${AGENTS_CONTEXT}" ".agents/AGENTS.md" 120000
+append_capped_file "${AGENTS_CONTEXT}" "managed agent context" 120000
 
 cat <<EOF
 
