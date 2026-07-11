@@ -19,12 +19,12 @@ afterEach(() => {
     fs.rmSync(tempHome, { recursive: true, force: true });
     tempHome = null;
   }
-  delete process.env.SKYAGENT_HOME;
+  delete process.env.AGENTS_HOME;
 });
 
 function isolatedSkyAgentHome() {
   tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-profile-cache-test-"));
-  process.env.SKYAGENT_HOME = tempHome;
+  process.env.AGENTS_HOME = tempHome;
 }
 
 function context(profileId = "profile-1", cuteName = "Apple", member = {}) {

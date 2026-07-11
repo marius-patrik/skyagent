@@ -2,15 +2,12 @@
   "name": "@skyagent/cli",
   "version": "2.0.0",
   "type": "module",
-  "bin": {
-    "skyagent": "./src/bin.ts"
-  },
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
     "@skyagent/core": "workspace:*",
-    "@skyagent/gateway": "workspace:*",
+    "@skyagent/mcp": "workspace:*",
     "@skyagent/tui": "workspace:*",
     "@skyagent/web": "workspace:*"
   }

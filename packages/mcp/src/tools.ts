@@ -6,99 +6,14 @@ export const tools = [
   },
   {
     name: "skyagent_config_set",
-    description: "Store SkyAgent username, UUID, selected SkyBlock profile ID, or Hypixel API key in the user config store.",
+    description: "Store SkyAgent username, UUID, or selected SkyBlock profile ID in canonical Agent OS application state.",
     inputSchema: {
       type: "object",
       properties: {
-        key: { type: "string", enum: ["username", "uuid", "profile", "api-key"] },
+        key: { type: "string", enum: ["username", "uuid", "profile"] },
         value: { type: "string" },
       },
       required: ["key", "value"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "skyagent_llm_provider_status",
-    description: "Return SkyAgent LLM provider status for the LiteLLM/OpenAI-compatible gateway without revealing provider secrets.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "skyagent_llm_provider_config_get",
-    description: "Read SkyAgent LLM provider config metadata without revealing LiteLLM virtual keys or endpoint auth material.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "skyagent_llm_provider_config_set",
-    description: "Store SkyAgent LLM provider config for LiteLLM/OpenAI-compatible routing. Secrets are redacted from the response.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        key: { type: "string", enum: ["provider", "base-url", "model", "api-key", "timeout-ms", "max-retries", "rate-limit-rpm", "rate-limit-tpm", "budget-usd", "budget-window"] },
-        value: { type: "string" },
-      },
-      required: ["key", "value"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "skyagent_memory_add",
-    description: "Store a durable SkyAgent note, preference, goal, or profile-analysis memory.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        text: { type: "string" },
-        tags: { type: "array", items: { type: "string" } },
-      },
-      required: ["text"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "skyagent_memory_list",
-    description: "List stored SkyAgent memories.",
-    inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  },
-  {
-    name: "skyagent_memory_delete",
-    description: "Delete a SkyAgent memory by ID.",
-    inputSchema: {
-      type: "object",
-      properties: { id: { type: "string" } },
-      required: ["id"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "skyagent_start",
-    description: "Start a SkyAgent agent session and return the compact startup context first: setup, profile, objectives, server/provider status, recent events, follow-up tools, and an agent.session_start event.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        player: { type: "string" },
-        profile: { type: "string" },
-        refresh: { type: "boolean" },
-        cacheOnly: { type: "boolean" },
-        allowStale: { type: "boolean" },
-        ttlMs: { type: "number" },
-        sinceSequence: { type: "number" },
-        limit: { type: "number" },
-        type: { type: "string" },
-      },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "skyagent_context_bootstrap",
-    description: "Read a cached compact SkyAgent session-start context capsule with profile identity, gear/pet/accessory/readiness summaries, provider freshness, warnings, and follow-up tools.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        player: { type: "string" },
-        profile: { type: "string" },
-        cacheOnly: { type: "boolean" },
-        allowStale: { type: "boolean" },
-        ttlMs: { type: "number" },
-      },
       additionalProperties: false,
     },
   },
@@ -141,20 +56,7 @@ export const tools = [
   },
   {
     name: "skyagent_context_events",
-    description: "Read bounded SkyAgent context event history for reconnects, polling, and agent session state.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        sinceSequence: { type: "number" },
-        limit: { type: "number" },
-        type: { type: "string" },
-      },
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "skyagent_context_watch",
-    description: "Read context events since a sequence for watch-style polling without opening a raw stream.",
+    description: "Read bounded SkyAgent domain event history for reconnects and polling.",
     inputSchema: {
       type: "object",
       properties: {
@@ -762,8 +664,7 @@ const configKeyMap = {
   username: "username",
   uuid: "uuid",
   profile: "selectedProfileId",
-  "api-key": "apiKey",
-};
+} as const;
 
 export function textResult(value) {
   return {
@@ -795,49 +696,9 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
     }
     case "skyagent_config_set": {
       const { setConfigValue } = await import("@skyagent/core/store");
+      if (!configKeyMap[args.key]) throw new Error("Unsupported SkyAgent config key. Secrets are managed by Agent OS.");
       return setConfigValue(configKeyMap[args.key], args.value);
     }
-    case "skyagent_llm_provider_status": {
-      const { llmProviderStatus } = await import("@skyagent/core/llm-provider");
-      return llmProviderStatus();
-    }
-    case "skyagent_llm_provider_config_get": {
-      const { publicLlmProviderConfig } = await import("@skyagent/core/llm-provider");
-      return publicLlmProviderConfig();
-    }
-    case "skyagent_llm_provider_config_set": {
-      const { setLlmProviderConfigValue } = await import("@skyagent/core/llm-provider");
-      return setLlmProviderConfigValue(args.key, args.value);
-    }
-    case "skyagent_memory_add": {
-      const { addMemory } = await import("@skyagent/core/store");
-      return addMemory({ text: args.text, tags: args.tags ?? [], source: "mcp" });
-    }
-    case "skyagent_memory_list": {
-      const { readMemories } = await import("@skyagent/core/store");
-      return readMemories();
-    }
-    case "skyagent_memory_delete": {
-      const { deleteMemory } = await import("@skyagent/core/store");
-      return deleteMemory(args.id);
-    }
-    case "skyagent_start": {
-      const { startSkyAgentSession } = await import("@skyagent/core/start");
-      return startSkyAgentSession({
-        player: args.player,
-        profile: args.profile,
-        refresh: Boolean(args.refresh),
-        cacheOnly: Object.prototype.hasOwnProperty.call(args, "cacheOnly") ? Boolean(args.cacheOnly) : undefined,
-        allowStale: Boolean(args.allowStale),
-        ttlMs: args.ttlMs,
-        sinceSequence: args.sinceSequence,
-        limit: args.limit,
-        type: args.type,
-        sourceKind: "mcp",
-        sourceTransport: "tool",
-      });
-    }
-    case "skyagent_context_bootstrap":
     case "skyagent_context_get": {
       const { agentContextForPlayer } = await import("@skyagent/core/agent-context");
       return agentContextForPlayer(args.player, args.profile, {
@@ -857,8 +718,7 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
       const { serverStatusForPlayer } = await import("@skyagent/core/context-events");
       return serverStatusForPlayer(args.player);
     }
-    case "skyagent_context_events":
-    case "skyagent_context_watch": {
+    case "skyagent_context_events": {
       const { readContextEvents } = await import("@skyagent/core/context-events");
       return readContextEvents(args);
     }
@@ -1159,4 +1019,3 @@ export async function callTool(name: string, args: Record<string, any> = {}) {
       throw new Error(`Unknown tool: ${name}`);
   }
 }
-

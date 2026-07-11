@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "skyagent",
+  "name": "SkyAgent",
+  "kind": "app",
+  "description": "Hypixel SkyBlock profile analysis, progression planning, terminal UI, web UI, and MCP service for Agent OS.",
+  "entry": "bun packages/cli/src/bin.ts",
+  "requires": {
+    "clis": ["bun"],
+    "state": ["runtime/apps/skyagent", "secrets/HYPIXEL_API_KEY.secret"]
+  },
+  "provides": ["cli:skyagent", "service:mcp:skyagent", "ui:tui:skyagent", "ui:web:skyagent", "skills:skyagent"]
+}

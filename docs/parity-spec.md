@@ -26,7 +26,7 @@ SkyAgent currently has:
 - Player/status/profile/museum/garden/bingo endpoints.
 - Public SkyBlock resources, Bazaar, auctions, ended auctions, fire sales, and news.
 - Compact profile summaries, member extraction, profile overview metadata, and SkyCrypt URL generation.
-- Local user config and memories.
+- Canonical Agent OS application config and structured SkyBlock objectives.
 
 It does not yet parse inventory NBT, normalize items, calculate prices/networth, identify missing upgrades, or render full profile sections.
 
@@ -362,7 +362,7 @@ Turn profile state and calculators into action plans:
 ### Implementation
 
 - Add `packages/core/src/planner.ts`.
-- Use structured inputs from sections, networth, prices, and memories.
+- Use structured inputs from sections, networth, prices, and objectives.
 - Keep recommendation logic explainable: every recommendation should include reason, expected impact, cost/time estimate, prerequisites, and source freshness.
 
 ### CLI
@@ -416,7 +416,7 @@ Add a web app for interactive inspection and planning.
 
 ### CLI And MCP Parity
 
-Every high-value CLI command must have a corresponding MCP tool. MCP outputs should include enough provenance for Codex to reason safely:
+Every high-value CLI command must have a corresponding MCP tool. MCP outputs should include enough provenance for the active Agent OS model to reason safely:
 
 - Source provider.
 - Fetched time.
@@ -442,7 +442,7 @@ Every high-value CLI command must have a corresponding MCP tool. MCP outputs sho
 - Do not print API keys.
 - Do not commit profile snapshots.
 - Treat third-party provider URLs and responses as untrusted input.
-- Keep CI Codex review secrets isolated from untrusted PR workflow code.
+- Keep all CI secrets isolated from untrusted pull-request code.
 
 ## Future Issue Slices
 
@@ -458,4 +458,3 @@ Recommended issue order:
 8. Add weight/readiness calculators.
 9. Add goal planner.
 10. Scaffold web app with Bun/Rsbuild/React/TypeScript/shadcn/ui.
-

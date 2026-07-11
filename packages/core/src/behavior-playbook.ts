@@ -1,5 +1,5 @@
 export type SkyAgentBehaviorIntent =
-  | "session_start"
+  | "context_load"
   | "broad_planning"
   | "museum_goal"
   | "damage_slayer_goal"
@@ -39,12 +39,12 @@ export type SkyAgentBehaviorRoute = {
 
 const bootstrapSteps: SkyAgentBehaviorStep[] = [
   {
-    id: "start",
-    tool: "skyagent_start",
+    id: "context",
+    tool: "skyagent_context_get",
     reason: "Load configured player/profile, compact profile context, objectives, provider/server status, recent events, and follow-up tool hints.",
     required: true,
     compact: true,
-    fallback: ["skyagent_context_bootstrap", "skyagent setup status --json", "skyagent context --cache-only --allow-stale"],
+    fallback: ["agents packages run skyagent -- setup status --json", "agents packages run skyagent -- context --cache-only --allow-stale"],
   },
   {
     id: "objectives",
@@ -52,7 +52,7 @@ const bootstrapSteps: SkyAgentBehaviorStep[] = [
     reason: "Read durable goals, todos, buy-list entries, source items, and snipe targets before planning.",
     required: true,
     compact: true,
-    fallback: ["skyagent objective list --json", "empty objective summary with warning"],
+    fallback: ["agents packages run skyagent -- objective list --json", "empty objective summary with warning"],
   },
   {
     id: "status",
@@ -60,7 +60,7 @@ const bootstrapSteps: SkyAgentBehaviorStep[] = [
     reason: "Capture Hypixel API availability, online state, maintenance/server warnings, and session fields.",
     required: true,
     compact: true,
-    fallback: ["provider status from skyagent_start", "warn that server status is unavailable"],
+    fallback: ["data-source status from skyagent_context_get", "warn that server status is unavailable"],
   },
 ];
 
@@ -77,7 +77,7 @@ const fallbackRules: SkyAgentFallbackRule[] = [
   {
     condition: "MCP tools unavailable",
     action: "Use equivalent non-interactive CLI commands and keep JSON output compact.",
-    doBeforeTellingUser: ["try skyagent start --json", "try the narrow skyagent CLI command", "report exact missing MCP surface only after CLI fallback fails"],
+    doBeforeTellingUser: ["try agents packages run skyagent -- context --cache-only --allow-stale", "try the narrow canonical package command", "report the exact missing MCP surface only after the package command fails"],
   },
   {
     condition: "stale cache",
@@ -97,7 +97,7 @@ const fallbackRules: SkyAgentFallbackRule[] = [
   {
     condition: "missing API key",
     action: "Use cached public context where possible and return setup guidance without exposing secrets.",
-    doBeforeTellingUser: ["try cache-only context", "try public resources", "show skyagent setup status requirements"],
+    doBeforeTellingUser: ["try cache-only context", "try public resources", "show canonical setup status requirements"],
   },
   {
     condition: "server maintenance or provider outage",
@@ -131,8 +131,8 @@ function route(intent: SkyAgentBehaviorIntent, purpose: string, steps: SkyAgentB
 
 export function skyAgentBehaviorRoute(intent: SkyAgentBehaviorIntent): SkyAgentBehaviorRoute {
   switch (intent) {
-    case "session_start":
-      return route("session_start", "Start or attach to SkyAgent with enough compact context to choose the next tools.", []);
+    case "context_load":
+      return route("context_load", "Load compact SkyAgent domain context without creating a separate model session.", []);
     case "museum_goal":
       return route("museum_goal", "Plan concrete museum progress from owned/donatable state rather than generic progression.", [
         {

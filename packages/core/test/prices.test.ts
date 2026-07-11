@@ -145,7 +145,7 @@ describe("price providers", () => {
 
   test("returns unavailable result for provider outage", async () => {
     const result = await coflnetLowestBin("HYPERION", {
-      fetchImpl: async () => new Response("bad gateway", { status: 502 }),
+      fetchImpl: async () => new Response("upstream failure", { status: 502 }),
     });
 
     expect(result.price).toBeNull();
@@ -412,7 +412,7 @@ describe("price providers", () => {
 
   test("lowestBin falls back from CoflNet outage to Hypixel auctions", async () => {
     const result = await lowestBin("HYPERION", {
-      fetchImpl: async () => new Response("bad gateway", { status: 502 }),
+      fetchImpl: async () => new Response("upstream failure", { status: 502 }),
       auctionResponses: [{
         auctions: [
           { uuid: "cheap", bin: true, starting_bid: 1_900_000_000, item_bytes: auctionPayload("HYPERION") },

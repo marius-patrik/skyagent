@@ -131,9 +131,9 @@ describe("context events", () => {
   });
 
   test("keeps live stream and reconnect reads in one sequence space after persisted history", () => {
-    const previousHome = process.env.SKYAGENT_HOME;
+    const previousHome = process.env.AGENTS_HOME;
     const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-context-home-"));
-    process.env.SKYAGENT_HOME = tempHome;
+    process.env.AGENTS_HOME = tempHome;
     contextEventBus.clear();
     try {
       const persisted = persistContextEvent({
@@ -155,9 +155,9 @@ describe("context events", () => {
     } finally {
       contextEventBus.clear();
       if (previousHome === undefined) {
-        delete process.env.SKYAGENT_HOME;
+        delete process.env.AGENTS_HOME;
       } else {
-        process.env.SKYAGENT_HOME = previousHome;
+        process.env.AGENTS_HOME = previousHome;
       }
       fs.rmSync(tempHome, { recursive: true, force: true });
     }
@@ -402,7 +402,7 @@ describe("server status", () => {
       uuidFromNameOrUuid: async () => "uuid-1",
       providerStatus: () => ({ generatedAt: new Date(1_000).toISOString(), providers: [], warnings: [] }),
       hypixelRequest: async () => {
-        throw new Error("Hypixel API key is required. Set HYPIXEL_API_KEY or run `skyagent config set api-key <key>`.");
+        throw new Error("Hypixel API key is required. Run `agents secrets set HYPIXEL_API_KEY`.");
       },
     });
 

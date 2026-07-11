@@ -1,15 +1,9 @@
 .env
 .env.*
-!.env.example
 node_modules/
 packages/*/node_modules/
-!.codex-plugin/runtime/modules/node_modules/
-!.codex-plugin/runtime/modules/node_modules/**
 dist/
-!.codex-plugin/runtime/modules/**/dist/
-!.codex-plugin/runtime/modules/**/dist/**
-!packages/web/dist/
-!packages/web/dist/**
+packages/*/dist/
 coverage/
 artifacts/
 *.log

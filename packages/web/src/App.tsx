@@ -38,9 +38,7 @@ const views: Array<{ id: ViewId; label: string; icon: typeof Boxes }> = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-type GatewaySettings = {
-  baseUrl: string;
-  token: string;
+type ProfileSettings = {
   player: string;
   profile: string;
 };
@@ -74,10 +72,8 @@ function storageValue(key: string, fallback: string) {
   return typeof window === "undefined" ? fallback : window.localStorage.getItem(key) ?? fallback;
 }
 
-async function gatewayRequest(settings: GatewaySettings, route: string) {
-  const response = await fetch(`${settings.baseUrl.replace(/\/$/, "")}${route}`, {
-    headers: settings.token ? { authorization: `Bearer ${settings.token}` } : {},
-  });
+async function appRequest(route: string) {
+  const response = await fetch(route);
   if (!response.ok) throw new Error(`${route} failed: HTTP ${response.status}`);
   return response.json();
 }
@@ -200,7 +196,7 @@ function Inventory() {
       <div className="section-heading">
         <div>
           <h2>Inventory Sections</h2>
-          <p>Gateway-ready section cards keep decoded counts, warnings, and priced value separate.</p>
+          <p>Section cards keep decoded counts, warnings, and priced value separate.</p>
         </div>
         <Boxes size={20} />
       </div>
@@ -466,40 +462,35 @@ function SettingsView({
   status,
   onLoad,
 }: {
-  settings: GatewaySettings;
-  setSettings: (settings: GatewaySettings) => void;
+  settings: ProfileSettings;
+  setSettings: (settings: ProfileSettings) => void;
   status: string;
   onLoad: () => void;
 }) {
-  function update(key: keyof GatewaySettings, value: string) {
+  function update(key: keyof ProfileSettings, value: string) {
     const next = { ...settings, [key]: value };
     setSettings(next);
-    for (const [entryKey, entryValue] of Object.entries(next)) {
-      if (entryKey === "token") continue;
-      window.localStorage.setItem(`skyagent.web.${entryKey}`, entryValue);
-    }
+    for (const [entryKey, entryValue] of Object.entries(next)) window.localStorage.setItem(`skyagent.web.${entryKey}`, entryValue);
   }
   return (
     <section className="panel wide">
       <div className="section-heading">
         <div>
-          <h2>Gateway Settings</h2>
-          <p>Connect this dashboard to the local SkyAgent gateway. Mock data is used only when the gateway is not configured.</p>
+          <h2>Profile Settings</h2>
+          <p>Select the player and profile read by the local SkyAgent application service.</p>
         </div>
         <Settings size={20} />
       </div>
       <div className="settings-grid">
         {([
-          ["baseUrl", "Gateway URL", "http://127.0.0.1:18472"],
-          ["token", "Gateway token", "local bearer token"],
           ["player", "Player", "Minecraft username or UUID"],
           ["profile", "Profile", "Cute name or profile ID"],
-        ] as Array<[keyof GatewaySettings, string, string]>).map(([key, label, placeholder]) => (
+        ] as Array<[keyof ProfileSettings, string, string]>).map(([key, label, placeholder]) => (
           <label className="settings-field" key={key}>
             <span>{label}</span>
             <input
               value={settings[key]}
-              type={key === "token" ? "password" : "text"}
+              type="text"
               placeholder={placeholder}
               onChange={(event) => update(key, event.currentTarget.value)}
             />
@@ -507,13 +498,10 @@ function SettingsView({
         ))}
       </div>
       <div className="cache-summary">
-        <strong>Gateway contract</strong>
-        <span>/overview, /inventory, /networth, /accessories, /progression, /provider-status · {status}</span>
+        <strong>Application service</strong>
+        <span>/api/overview, /api/inventory, /api/networth, /api/accessories, /api/progression, /api/provider-status · {status}</span>
       </div>
-      <p className="settings-note">
-        The bearer token stays in memory for this browser tab only. It is never written to localStorage.
-      </p>
-      <Button className="action-button" onClick={onLoad}><RefreshCw size={16} /> Load Gateway Data</Button>
+      <Button className="action-button" onClick={onLoad}><RefreshCw size={16} /> Load Profile Data</Button>
     </section>
   );
 }
@@ -521,8 +509,8 @@ function SettingsView({
 function ActiveView({ view, live, settings, setSettings, status, onLoad, packState, setPackState }: {
   view: ViewId;
   live: any;
-  settings: GatewaySettings;
-  setSettings: (settings: GatewaySettings) => void;
+  settings: ProfileSettings;
+  setSettings: (settings: ProfileSettings) => void;
   status: string;
   onLoad: () => void;
   packState: PackState;
@@ -539,9 +527,7 @@ function ActiveView({ view, live, settings, setSettings, status, onLoad, packSta
 }
 
 export function App() {
-  const [settings, setSettings] = useState<GatewaySettings>(() => ({
-    baseUrl: storageValue("skyagent.web.baseUrl", "http://127.0.0.1:18472"),
-    token: "",
+  const [settings, setSettings] = useState<ProfileSettings>(() => ({
     player: storageValue("skyagent.web.player", mockProfile.username),
     profile: storageValue("skyagent.web.profile", mockProfile.profile),
   }));
@@ -549,19 +535,19 @@ export function App() {
     packs: resourcePacks,
     sources: defaultPackSources,
   });
-  const [status, setStatus] = useState("mock fallback active");
+  const [status, setStatus] = useState("profile data not loaded");
   const [live, setLive] = useState<any>({ profile: mockProfile });
-  async function loadGatewayData() {
+  async function loadProfileData() {
     try {
-      setStatus("loading gateway data");
+      setStatus("loading profile data");
       const query = `player=${encodeURIComponent(settings.player)}&profile=${encodeURIComponent(settings.profile)}`;
       const [overview, inventory, networth, accessoryData, progressionData, providers] = await Promise.all([
-        gatewayRequest(settings, `/overview?${query}`),
-        gatewayRequest(settings, `/inventory?${query}`),
-        gatewayRequest(settings, `/networth?${query}`),
-        gatewayRequest(settings, `/accessories?${query}`),
-        gatewayRequest(settings, `/progression?${query}`),
-        gatewayRequest(settings, "/provider-status"),
+        appRequest(`/api/overview?${query}`),
+        appRequest(`/api/inventory?${query}`),
+        appRequest(`/api/networth?${query}`),
+        appRequest(`/api/accessories?${query}`),
+        appRequest(`/api/progression?${query}`),
+        appRequest("/api/provider-status"),
       ]);
       setLive({
         profile: {
@@ -578,9 +564,9 @@ export function App() {
         progression: progressionData,
         providers,
       });
-      setStatus("live gateway data loaded");
+      setStatus("profile data loaded");
     } catch (error) {
-      setStatus(`gateway unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      setStatus(`profile data unavailable: ${error instanceof Error ? error.message : String(error)}`);
       setLive({ profile: { ...mockProfile, username: settings.player || mockProfile.username, profile: settings.profile || mockProfile.profile } });
     }
   }
@@ -609,10 +595,10 @@ export function App() {
       <main className="workspace">
         <header className="topbar">
           <div>
-            <span className="eyebrow">Gateway local-first UI</span>
+            <span className="eyebrow">Agent OS local application</span>
             <h1>SkyBlock Profile Analysis</h1>
           </div>
-          <Button className="action-button" onClick={loadGatewayData}><CircleDollarSign size={16} /> Load Gateway</Button>
+          <Button className="action-button" onClick={loadProfileData}><CircleDollarSign size={16} /> Load Profile</Button>
         </header>
         <ProviderStrip />
         {views.map((view) => (
@@ -623,7 +609,7 @@ export function App() {
               settings={settings}
               setSettings={setSettings}
               status={status}
-              onLoad={loadGatewayData}
+              onLoad={loadProfileData}
               packState={packState}
               setPackState={setPackState}
             />

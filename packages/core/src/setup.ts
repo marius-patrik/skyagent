@@ -3,11 +3,8 @@ import { hypixelRequest, resolveMinecraftUsername, skyblockProfiles } from "./hy
 import { profileSummaries } from "./profile.ts";
 import { dataDir, getApiKey, publicConfig, readConfig, setConfigValue } from "./store.ts";
 
-declare const SKYAGENT_BUILD_VERSION: string | undefined;
-
 type SetupInput = {
   username?: string | null;
-  apiKey?: string | null;
   profile?: string | null;
   write?: boolean;
 };
@@ -15,7 +12,7 @@ type SetupInput = {
 type SetupDeps = {
   resolveMinecraftUsername?: typeof resolveMinecraftUsername;
   skyblockProfiles?: typeof skyblockProfiles;
-  providerCheck?: (context?: { apiKey?: string }) => Promise<unknown>;
+  providerCheck?: () => Promise<unknown>;
   setConfigValue?: typeof setConfigValue;
   readConfig?: typeof readConfig;
   publicConfig?: typeof publicConfig;
@@ -23,9 +20,6 @@ type SetupDeps = {
 };
 
 function packageVersion() {
-  if (typeof SKYAGENT_BUILD_VERSION === "string") {
-    return SKYAGENT_BUILD_VERSION;
-  }
   return packageMetadata.version ?? "unknown";
 }
 
@@ -74,7 +68,7 @@ export async function runSetup(input: SetupInput = {}, deps: SetupDeps = {}) {
   const key = deps.getApiKey ?? getApiKey;
   const resolveName = deps.resolveMinecraftUsername ?? resolveMinecraftUsername;
   const fetchProfiles = deps.skyblockProfiles ?? skyblockProfiles;
-  const providerCheck = deps.providerCheck ?? ((context) => hypixelRequest("resources/skyblock/bingo", {}, { apiKey: context?.apiKey }));
+  const providerCheck = deps.providerCheck ?? (() => hypixelRequest("resources/skyblock/bingo"));
   const shouldWrite = input.write !== false;
   const steps = [];
   const required = [];
@@ -99,16 +93,11 @@ export async function runSetup(input: SetupInput = {}, deps: SetupDeps = {}) {
   }
   steps.push(step("player", "ok", `Resolved ${resolved.username}.`));
 
-  if (input.apiKey) {
-    if (shouldWrite) {
-      writeConfigValue("apiKey", input.apiKey);
-    }
-    steps.push(step("auth", "ok", "Stored Hypixel API key in local config."));
-  } else if (key(read())) {
-    steps.push(step("auth", "ok", "Hypixel API key is already configured."));
+  if (key()) {
+    steps.push(step("auth", "ok", "Hypixel API key is available from the canonical Agent OS secret store."));
   } else {
     required.push("apiKey");
-    steps.push(step("auth", "missing", "Hypixel API key is required for SkyBlock profiles."));
+    steps.push(step("auth", "missing", "Set HYPIXEL_API_KEY with 'agents secrets set HYPIXEL_API_KEY'."));
     steps.push(step("profile", "skipped", "Profile selection skipped until auth is configured."));
     return {
       complete: false,
@@ -119,9 +108,7 @@ export async function runSetup(input: SetupInput = {}, deps: SetupDeps = {}) {
     };
   }
 
-  const profilesResponse = input.apiKey && !shouldWrite && !deps.skyblockProfiles
-    ? await hypixelRequest("skyblock/profiles", { uuid: resolved.uuid }, { requireKey: true, apiKey: input.apiKey })
-    : await fetchProfiles(resolved.uuid);
+  const profilesResponse = await fetchProfiles(resolved.uuid);
   const profiles = profileSummaries(profilesResponse.body?.profiles ?? [], resolved.uuid);
   const selectedProfile = chooseProfile(profiles, input.profile || config.selectedProfileId);
   if (!selectedProfile) {
@@ -147,7 +134,7 @@ export async function runSetup(input: SetupInput = {}, deps: SetupDeps = {}) {
   }
   steps.push(step("profile", "ok", `Selected ${selectedProfile.cuteName ?? selectedProfile.profileId}.`));
 
-  await providerCheck({ apiKey: input.apiKey && !shouldWrite ? input.apiKey : undefined });
+  await providerCheck();
   steps.push(step("providerCheck", "ok", "SkyBlock provider check completed."));
 
   return {

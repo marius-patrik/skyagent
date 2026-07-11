@@ -70,16 +70,16 @@ function context() {
 }
 
 beforeEach(() => {
-  previousHome = process.env.SKYAGENT_HOME;
+  previousHome = process.env.AGENTS_HOME;
   tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-museum-test-"));
-  process.env.SKYAGENT_HOME = tempHome;
+  process.env.AGENTS_HOME = tempHome;
 });
 
 afterEach(() => {
   if (previousHome === undefined) {
-    delete process.env.SKYAGENT_HOME;
+    delete process.env.AGENTS_HOME;
   } else {
-    process.env.SKYAGENT_HOME = previousHome;
+    process.env.AGENTS_HOME = previousHome;
   }
   fs.rmSync(tempHome, { recursive: true, force: true });
 });

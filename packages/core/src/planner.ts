@@ -5,7 +5,7 @@ import { createObjectiveItem, objectiveContextSummary, updateObjectiveItem } fro
 import { fetchProfileContext } from "./profile.ts";
 import { readinessFromContext, readinessGearContextFromMember, readinessTargetFromGoal, READINESS_AREAS } from "./readiness.ts";
 import { progressionFromContext } from "./sections/index.ts";
-import { publicConfig, readMemories } from "./store.ts";
+import { publicConfig } from "./store.ts";
 
 const VERIFIED_AT = "2026-07-01";
 
@@ -175,26 +175,6 @@ function accessoryRecommendations(accessories: any, budget: number | null, optio
     }));
 }
 
-function memorySnippet(memory: any) {
-  return String(memory?.text ?? "").replace(/\s+/g, " ").trim().slice(0, 140);
-}
-
-function relevantMemories(goal: string, memories: any[]) {
-  const normalized = normalizeGoal(goal);
-  const terms = new Set(normalized.split(/[^a-z0-9]+/).filter((term) => term.length >= 3));
-  return memories
-    .map((memory) => ({
-      id: memory.id ?? null,
-      tags: Array.isArray(memory.tags) ? memory.tags : [],
-      text: memorySnippet(memory),
-    }))
-    .filter((memory) => {
-      const haystack = `${memory.text} ${memory.tags.join(" ")}`.toLowerCase();
-      return terms.size === 0 || [...terms].some((term) => haystack.includes(term)) || memory.tags.includes("goal") || memory.tags.includes("preference");
-    })
-    .slice(0, 5);
-}
-
 function sectionByName(progression: any, name: string) {
   return (progression?.sections ?? []).find((section: any) => section.section === name) ?? null;
 }
@@ -340,20 +320,6 @@ function attachObjectiveStateToRoutes(routes: any[], objectiveState: any) {
       }, ...rest],
     };
   });
-}
-
-function memoryRecommendations(goal: string, memories: any[]) {
-  return relevantMemories(goal, memories).map((memory, index) => recommendation({
-    id: `memory-${memory.id ?? index}`,
-    title: "Apply saved SkyAgent note",
-    category: "memory_context",
-    priority: 65 - index,
-    reason: memory.text ? `Saved note relevant to this plan: ${memory.text}` : "A saved note matched this goal.",
-    expectedImpact: "Keeps recommendations aligned with durable user goals, constraints, or preferences.",
-    prerequisites: [{ memoryId: memory.id, tags: memory.tags }],
-    sourceFreshness: { source: "skyagent-memory", status: "local", verifiedAt: VERIFIED_AT },
-    uncertainty: "low",
-  }));
 }
 
 function moneyRouteRecommendations(goal: string, context: any, progression: any, readiness: any[], networth: any, providerFreshness: any[], budget: number | null) {
@@ -827,7 +793,6 @@ function persistPlanObjectives(goal: string, workItems: any, options: Record<str
 
 export async function planGoalFromContext(context: any, goal: string, options: {
   budget?: number | null;
-  memories?: any[];
   config?: any;
   networthProvider?: (context: any) => Promise<any> | any;
   accessoriesProvider?: (member: any, budget: number | null) => Promise<any> | any;
@@ -877,7 +842,6 @@ export async function planGoalFromContext(context: any, goal: string, options: {
     budget,
     providerFreshness,
   }));
-  const memories = options.memories ?? readMemories();
   const config = options.config ?? publicConfig();
   const contextCapsule = options.contextCapsule ?? null;
   const objectives = options.objectives ?? objectiveContextSummary();
@@ -885,7 +849,6 @@ export async function planGoalFromContext(context: any, goal: string, options: {
   const recommendations = sortRecommendations([
     ...accessoryRecommendations(accessories, budget, { includeUnpricedSource }),
     ...readinessRecommendations(readiness),
-    ...memoryRecommendations(goal, memories),
     ...routeRecommendations(goal, areas, readiness, context, progression, networth, accessories, providerFreshness, budget, objectives),
   ]);
   const workItems = planWorkItems(recommendations, budget);
@@ -929,8 +892,6 @@ export async function planGoalFromContext(context: any, goal: string, options: {
       })),
       readinessFollowUpRoutes: readinessRoutes,
       accessoryUpgradeCount: accessories?.upgrades?.length ?? 0,
-      memoryCount: memories.length,
-      usedMemories: relevantMemories(goal, memories),
       contextCapsule: contextCapsule ? {
         cache: contextCapsule.cache ?? null,
         generatedAt: contextCapsule.generatedAt ?? null,
@@ -1002,7 +963,7 @@ export async function planGoalForPlayer(goal: string, player?: string, profile?:
       contextWarnings.push({
         code: "context_capsule_unavailable",
         message: `Planner could not read context capsule: ${(error as Error).message}`,
-        sourcePath: "skyagent_context_bootstrap",
+        sourcePath: "skyagent_context_get",
       });
     }
   }

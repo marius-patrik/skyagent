@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { accessoriesForPlayer } from "@skyagent/core/accessories";
+import { inventoryForPlayer } from "@skyagent/core/inventory";
+import { networthForPlayer } from "@skyagent/core/networth";
+import { compactProfileOverview, fetchProfileContext } from "@skyagent/core/profile";
+import { progressionForPlayer } from "@skyagent/core/sections";
+import { providerStatus } from "@skyagent/core/providers";
 
 export type ServeWebOptions = {
   host?: string;
@@ -48,6 +54,34 @@ function responseFromFile(filePath: string) {
   return new Response(Bun.file(filePath), { headers });
 }
 
+function jsonResponse(value: unknown, status = 200) {
+  return Response.json(value, {
+    status,
+    headers: { "cache-control": "no-store" },
+  });
+}
+
+async function applicationResponse(url: URL) {
+  const player = url.searchParams.get("player") || undefined;
+  const profile = url.searchParams.get("profile") || undefined;
+  switch (url.pathname) {
+    case "/api/overview":
+      return jsonResponse(compactProfileOverview(await fetchProfileContext(player, profile)));
+    case "/api/inventory":
+      return jsonResponse(await inventoryForPlayer(player, profile));
+    case "/api/networth":
+      return jsonResponse(await networthForPlayer(player, profile, { maxItems: 100, timeoutMs: 5_000, includeItems: false }));
+    case "/api/accessories":
+      return jsonResponse(await accessoriesForPlayer(player, profile, { maxPriceLookups: 40, timeoutMs: 4_000 }));
+    case "/api/progression":
+      return jsonResponse(await progressionForPlayer(player, profile));
+    case "/api/provider-status":
+      return jsonResponse(providerStatus());
+    default:
+      return jsonResponse({ error: "unknown SkyAgent application route" }, 404);
+  }
+}
+
 export function serveWeb(options: ServeWebOptions = {}) {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 18473;
@@ -59,8 +93,15 @@ export function serveWeb(options: ServeWebOptions = {}) {
   return Bun.serve({
     hostname: host,
     port,
-    fetch(request) {
+    async fetch(request) {
       const url = new URL(request.url);
+      if (url.pathname.startsWith("/api/")) {
+        try {
+          return await applicationResponse(url);
+        } catch (error) {
+          return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 400);
+        }
+      }
       const requestPath = url.pathname === "/" ? "/index.html" : url.pathname;
       const filePath = safeJoin(distDir, requestPath);
       if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {

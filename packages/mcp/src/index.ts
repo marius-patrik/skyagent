@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { callTool, textResult, tools } from "./tools.ts";
+import packageMetadata from "../../../package.json" with { type: "json" };
 
 function response(id, result) {
   return { jsonrpc: "2.0", id, result };
@@ -26,7 +27,7 @@ async function handle(message) {
         send(response(message.id, {
           protocolVersion: message.params?.protocolVersion ?? "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "skyagent", version: "2.0.0" },
+          serverInfo: { name: "skyagent", version: packageMetadata.version },
         }));
         break;
       case "tools/list":
@@ -92,4 +93,3 @@ export function startMcpServer() {
 if (import.meta.main) {
   startMcpServer();
 }
-

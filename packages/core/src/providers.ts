@@ -1,6 +1,6 @@
 import { metadataCacheStatus } from "./items.ts";
 import { priceCacheStatus } from "./prices.ts";
-import { getApiKey, readConfig } from "./store.ts";
+import { getApiKey } from "./store.ts";
 
 const SKYBLOCK_RESOURCE_KINDS = ["collections", "skills", "items", "election", "bingo"];
 
@@ -9,14 +9,13 @@ function nowIso() {
 }
 
 export function providerStatus() {
-  const config = readConfig();
-  const apiKeyConfigured = Boolean(getApiKey(config));
+  const apiKeyConfigured = Boolean(getApiKey());
   const priceCache = priceCacheStatus();
   const metadataCache = metadataCacheStatus();
   const warnings = [
     ...(apiKeyConfigured ? [] : [{
       code: "hypixel_api_key_missing",
-      message: "Hypixel profile endpoints that require an API key will fail until HYPIXEL_API_KEY or config api-key is set.",
+      message: "Hypixel profile endpoints that require an API key will fail until the Agent OS HYPIXEL_API_KEY secret is set.",
       source: "Hypixel API",
     }]),
     ...(priceCache.staleCount > 0 ? [{
@@ -41,7 +40,7 @@ export function providerStatus() {
         configured: apiKeyConfigured,
         auth: {
           apiKeyConfigured,
-          apiKeySource: config.apiKey ? "config" : process.env.HYPIXEL_API_KEY ? "env" : null,
+          apiKeySource: apiKeyConfigured ? "agent-os-secret" : null,
         },
         cache: null,
         warnings: apiKeyConfigured ? [] : warnings.filter((warning) => warning.code === "hypixel_api_key_missing"),

@@ -1,7 +1,0 @@
-interface:
-  display_name: "SkyAgent Live Progress"
-  short_description: "Read context event streams."
-  default_prompt: "Use $skyagent-live-progress to check recent SkyBlock context events."
-policy:
-  allow_implicit_invocation: true
-

@@ -13,12 +13,12 @@ afterEach(() => {
     fs.rmSync(tempHome, { recursive: true, force: true });
     tempHome = null;
   }
-  delete process.env.SKYAGENT_HOME;
+  delete process.env.AGENTS_HOME;
 });
 
 function isolatedSkyAgentHome() {
   tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "skyagent-planner-test-"));
-  process.env.SKYAGENT_HOME = tempHome;
+  process.env.AGENTS_HOME = tempHome;
 }
 
 function item(slot: number, internalId: string, displayName = internalId, extra: Record<string, any> = {}) {
@@ -139,24 +139,21 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([upgrade]),
-      memories: [{ id: "m1", tags: ["preference"], text: "prefers dungeons with cheap upgrades first" }],
       config: { username: "Player", selectedProfileId: "profile-id" },
     });
     const second = await planGoalFromContext(context(), "f7 dungeons", {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([upgrade]),
-      memories: [{ id: "m1", tags: ["preference"], text: "prefers dungeons with cheap upgrades first" }],
       config: { username: "Player", selectedProfileId: "profile-id" },
     });
 
     expect(first).toEqual(second);
     expect(first.inputs.areas).toEqual(["dungeons"]);
     expect(first.inputs.profileSections.some((section) => section.section === "dungeons")).toBe(true);
-    expect(first.inputs.memoryCount).toBe(1);
-    expect(first.inputs.usedMemories).toEqual([{ id: "m1", tags: ["preference"], text: "prefers dungeons with cheap upgrades first" }]);
     expect(first.recommendations[0]).toMatchObject({ id: "accessory-CHEAP_TALISMAN", category: "upgrade" });
-    expect(first.recommendations.some((entry) => entry.category === "memory_context")).toBe(true);
+    expect(first.inputs).not.toHaveProperty("memoryCount");
+    expect(first.recommendations.some((entry) => entry.category === "memory_context")).toBe(false);
     expect(first.recommendations.some((entry) => entry.id === "goal-route")).toBe(true);
     expect(first.recommendations.some((entry) => entry.id === "dungeons-catacombs_level")).toBe(true);
     expect(first.recommendations.some((entry) => entry.reason.includes("Readiness blocker catacombs_level"))).toBe(true);
@@ -194,7 +191,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([upgrade]),
-      memories: [],
       config: {},
     });
 
@@ -205,7 +201,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([upgrade]),
-      memories: [],
       config: {},
       persistObjectives: true,
       maxPersistedTasks: 1,
@@ -233,7 +228,6 @@ describe("planner", () => {
       budget: 2_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([]),
-      memories: [],
       config: {},
     });
     const routes = result.recommendations.filter((entry) => entry.category === "route");
@@ -267,7 +261,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([]),
-      memories: [],
       config: {},
     });
     const cropRoute = result.recommendations.find((entry) => entry.id === "farming-route-crop-milestones");
@@ -302,7 +295,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([]),
-      memories: [],
       config: {},
     });
     const cropRoute = result.recommendations.find((entry) => entry.id === "farming-route-crop-milestones");
@@ -320,7 +312,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([unknownPriceUpgrade, upgrade]),
-      memories: [],
       config: {},
       objectives: {
         counts: { objective: 1, buy: 1 },
@@ -356,7 +347,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([unknownPriceUpgrade, upgrade]),
-      memories: [],
       config: {},
     });
 
@@ -369,7 +359,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([]),
-      memories: [],
       config: {},
     });
     const dungeonRoute = dungeon.recommendations.find((entry) => entry.id === "dungeon-route-target-floor");
@@ -395,7 +384,6 @@ describe("planner", () => {
       budget: 5_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([]),
-      memories: [],
       config: {},
     });
     const kuudraRoute = kuudra.recommendations.find((entry) => entry.id === "kuudra-route-target-tier");
@@ -422,7 +410,6 @@ describe("planner", () => {
       budget: 1_000_000,
       networthProvider: networth,
       accessoriesProvider: () => accessories([upgrade]),
-      memories: [],
       config: {},
       persistObjectives: true,
       objectiveId: root.id,
@@ -454,7 +441,6 @@ describe("planner", () => {
     const result = await planGoalFromContext(context({ member: {} }), "mining", {
       networthProvider: () => ({ total: null, confidence: "none", warnings: [{ code: "networth_missing" }], providerFreshness: [] }),
       accessoriesProvider: () => accessories([]),
-      memories: [],
       config: {},
     });
 
@@ -478,7 +464,6 @@ describe("planner", () => {
         provider: { source: "stale-price", cacheStatus: "stale", fetchedAt: "2026-07-01T00:00:00.000Z" },
         warnings: [{ code: "stale_cache", message: "Using stale price" }],
       }]),
-      memories: [],
       config: {},
     });
 
@@ -505,7 +490,6 @@ describe("planner", () => {
         valuation: { status: "partial", priceLookupCount: 1, maxPriceLookups: 1 },
         warnings: [{ code: "accessory_price_limit_reached" }],
       }),
-      memories: [],
       config: {},
     });
 

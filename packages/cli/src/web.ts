@@ -3,7 +3,6 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensureDataDir } from "@skyagent/core/store";
-import { gatewayClient } from "@skyagent/gateway/manager";
 
 type WebRuntime = {
   pid: number;
@@ -12,7 +11,6 @@ type WebRuntime = {
   url: string;
   logPath: string;
   startedAt: string;
-  gatewayUrl: string;
   processIdentity: ProcessIdentity;
 };
 
@@ -111,18 +109,6 @@ function parsePort(args: string[]) {
   return 18473;
 }
 
-function gatewayArgs(args: string[]) {
-  const inline = args.find((arg) => arg.startsWith("--gateway-port="));
-  if (inline) {
-    return [`--port=${inline.slice("--gateway-port=".length)}`];
-  }
-  const index = args.indexOf("--gateway-port");
-  if (index !== -1) {
-    return [`--port=${args[index + 1]}`];
-  }
-  return [];
-}
-
 async function runtimeIsWeb(runtime: WebRuntime) {
   if (!sameProcessIdentity(runtime)) {
     return false;
@@ -154,7 +140,6 @@ async function publicRuntime(runtime: WebRuntime | null) {
     url: runtime.url,
     logPath: runtime.logPath,
     startedAt: runtime.startedAt,
-    gatewayUrl: runtime.gatewayUrl,
   };
 }
 
@@ -253,7 +238,6 @@ async function openUrl(url: string) {
 export async function startWebProcess(args: string[] = []) {
   const existing = readRuntime();
   if (existing && await runtimeIsWeb(existing)) {
-    await gatewayClient(gatewayArgs(args));
     const status = await publicRuntime(existing);
     if (!args.includes("--no-open")) {
       await openUrl(existing.url);
@@ -270,8 +254,6 @@ export async function startWebProcess(args: string[] = []) {
     throw new Error("Web port must be an integer between 1 and 65535.");
   }
   await assertPortAvailable(host, port);
-  const gateway = await gatewayClient(gatewayArgs(args));
-
   const logPath = webLogPath();
   fs.writeFileSync(logPath, "", { encoding: "utf8", flag: "a" });
   assertWebBundle();
@@ -292,7 +274,6 @@ export async function startWebProcess(args: string[] = []) {
     url: `http://${host}:${port}`,
     logPath,
     startedAt: new Date().toISOString(),
-    gatewayUrl: gateway.status.url,
     processIdentity: processIdentity(proc.pid) ?? { platform: process.platform, startTime: "", commandLine: "" },
   };
   if (!runtime.processIdentity.startTime) {
@@ -372,7 +353,6 @@ export async function webCommand(action = "status", args: string[] = []) {
   if (action === "open") {
     const status = await webStatus();
     if ("url" in status) {
-      await gatewayClient(gatewayArgs(args));
       return openUrl(status.url);
     }
     const started = await startWebProcess(["--no-open", ...args]);
@@ -384,5 +364,5 @@ export async function webCommand(action = "status", args: string[] = []) {
   if (action === "logs") {
     return webLogs();
   }
-  throw new Error("Usage: skyagent web start|stop|restart|status|open|logs");
+  throw new Error("Usage: agents packages run skyagent -- web start|stop|restart|status|open|logs");
 }

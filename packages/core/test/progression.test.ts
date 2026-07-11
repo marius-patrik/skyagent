@@ -174,7 +174,7 @@ describe("progression sections", () => {
     expect(missingData.sections.find((section) => section.section === "currencies")?.computed).toMatchObject({ purse: null, bank: null });
   });
 
-  test("supports legacy pets while preferring current pets_data pets", () => {
+  test("supports the older Hypixel pets field while preferring current pets_data", () => {
     const current = profileSectionFromContext({
       uuid: "player-uuid",
       profile: { profile_id: "profile-id" },
@@ -186,7 +186,7 @@ describe("progression sections", () => {
       },
       rateLimit: null,
     }, "pets");
-    const legacy = profileSectionFromContext({
+    const olderApi = profileSectionFromContext({
       uuid: "player-uuid",
       profile: { profile_id: "profile-id" },
       member: {
@@ -197,7 +197,7 @@ describe("progression sections", () => {
 
     expect(current.computed).toMatchObject({ count: 1, active: { type: "GOLDEN_DRAGON" } });
     expect(current.sourceFields).toEqual(["member.pets_data.pets", "member.pets"]);
-    expect(legacy.computed).toMatchObject({ count: 1 });
-    expect(legacy.warnings).toEqual([]);
+    expect(olderApi.computed).toMatchObject({ count: 1 });
+    expect(olderApi.warnings).toEqual([]);
   });
 });

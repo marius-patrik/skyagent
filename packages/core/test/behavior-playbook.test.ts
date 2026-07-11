@@ -5,7 +5,7 @@ test("behavior playbook bootstraps compact context before broad planning", () =>
   const route = skyAgentBehaviorRoute("broad_planning");
   const tools = route.steps.map((step) => step.tool);
 
-  expect(tools.slice(0, 3)).toEqual(["skyagent_start", "skyagent_objective_list", "skyagent_server_status"]);
+  expect(tools.slice(0, 3)).toEqual(["skyagent_context_get", "skyagent_objective_list", "skyagent_server_status"]);
   expect(route.steps.every((step) => step.compact)).toBe(true);
   expect(route.rawPayloadPolicy).toContain("Prefer compact summaries");
   expect(route.fallbackRules.map((rule) => rule.condition)).toEqual([
@@ -22,7 +22,7 @@ test("behavior playbook bootstraps compact context before broad planning", () =>
 test("behavior smoke routes museum goals to donation planner before generic progression planning", () => {
   const tools = skyAgentBehaviorToolNames("museum_goal");
 
-  expect(tools.slice(0, 3)).toEqual(["skyagent_start", "skyagent_objective_list", "skyagent_server_status"]);
+  expect(tools.slice(0, 3)).toEqual(["skyagent_context_get", "skyagent_objective_list", "skyagent_server_status"]);
   expect(tools).toContain("skyblock_museum_donation_plan");
   expect(tools).toContain("skyblock_profile_section:museum");
   expect(tools).toContain("skyblock_price");
@@ -40,7 +40,7 @@ test("behavior smoke checks complete damage and slayer context before purchases"
   const route = skyAgentBehaviorRoute("damage_slayer_goal");
   const tools = route.steps.map((step) => step.tool);
 
-  expect(tools.slice(0, 3)).toEqual(["skyagent_start", "skyagent_objective_list", "skyagent_server_status"]);
+  expect(tools.slice(0, 3)).toEqual(["skyagent_context_get", "skyagent_objective_list", "skyagent_server_status"]);
   expect(tools).toContain("skyblock_readiness:slayer");
   expect(tools).toContain("skyblock_inventory");
   expect(tools).toContain("skyblock_inventory_section:pets");

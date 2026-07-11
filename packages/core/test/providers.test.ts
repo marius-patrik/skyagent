@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bazaarPrice, clearMetadataCache, clearPriceCache, neuItemMetadata, providerStatus } from "../src/index.ts";
 
-const originalHome = process.env.SKYAGENT_HOME;
-const originalApiKey = process.env.HYPIXEL_API_KEY;
+const originalHome = process.env.AGENTS_HOME;
 let tempHome: string | null = null;
 
 afterEach(() => {
@@ -16,21 +15,15 @@ afterEach(() => {
     tempHome = null;
   }
   if (originalHome === undefined) {
-    delete process.env.SKYAGENT_HOME;
+    delete process.env.AGENTS_HOME;
   } else {
-    process.env.SKYAGENT_HOME = originalHome;
-  }
-  if (originalApiKey === undefined) {
-    delete process.env.HYPIXEL_API_KEY;
-  } else {
-    process.env.HYPIXEL_API_KEY = originalApiKey;
+    process.env.AGENTS_HOME = originalHome;
   }
 });
 
 function isolateConfig() {
   tempHome = mkdtempSync(join(tmpdir(), "skyagent-provider-test-"));
-  process.env.SKYAGENT_HOME = tempHome;
-  delete process.env.HYPIXEL_API_KEY;
+  process.env.AGENTS_HOME = tempHome;
 }
 
 function bazaarFixture() {

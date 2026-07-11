@@ -16,10 +16,8 @@ Use this skill when currentness, provider quality, stale formulas, parity drift,
 - Use `skyblock_resource` for public Hypixel resources such as items, skills, collections, election, and bingo.
 - Use `skyblock_news` for SkyBlock news when an API key is available.
 - Use economy tools to inspect provider freshness and stale-cache warnings.
-- Use `skyagent_llm_provider_status` when the question is about SkyAgent's LiteLLM/OpenAI-compatible model gateway, persistent-agent readiness, provider health, auth presence, rate limits, or budget metadata.
-- Use `skyagent_llm_provider_config_get` and `skyagent_llm_provider_config_set` only for local LLM gateway setup; never route product agent integration through `codex`, `codex exec`, or Codex CLI session/config state.
 - Use `skyagent_server_status` for Hypixel API availability, online/session state, warning codes, and `hypixel.server_status_change` context events.
-- Use `skyagent_context_events` or `skyagent_context_watch` for `provider.cache_status`, `provider.cache_status_change`, `hypixel.server_status_change`, and recent refresh history.
+- Use `skyagent_context_events` or `skyagent_context_events` for `provider.cache_status`, `provider.cache_status_change`, `hypixel.server_status_change`, and recent refresh history.
 - Use `$skyagent-context-engine` when provider status should be carried into broad profile or planning context.
 - Use `$skyagent-live-progress` when the task is mainly about event-stream or status-change monitoring.
 - When server maintenance, provider outage, stale cache, or partial provider data appears, route back with explicit degraded-freshness warnings instead of blocking the whole answer.

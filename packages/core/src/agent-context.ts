@@ -606,7 +606,7 @@ function contextSections(parts: Record<string, any>, events: any = null) {
       eventCount: null,
       warnings: compactWarnings([{
         code: "events_not_included",
-        message: "Recent context events are not embedded in this context capsule; use skyagent_context_events or skyagent_start when an event cursor is needed.",
+        message: "Recent context events are not embedded in this context capsule; use skyagent_context_events when an event cursor is needed.",
         sourcePath: "context-events",
       }], 1),
     },

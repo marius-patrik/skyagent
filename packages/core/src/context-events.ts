@@ -6,7 +6,7 @@ import { ensureDataDir } from "./store.ts";
 
 export const DEFAULT_CONTEXT_EVENT_HISTORY_LIMIT = 200;
 
-export type ContextEventSourceKind = "agent" | "cli" | "mcp" | "gateway" | "hypixel-api" | "profile-snapshot" | "provider-cache" | "minecraft-mod" | string;
+export type ContextEventSourceKind = "agent" | "cli" | "mcp" | "hypixel-api" | "profile-snapshot" | "provider-cache" | "minecraft-mod" | string;
 
 export type ContextEventSource = {
   kind: ContextEventSourceKind;

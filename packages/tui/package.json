@@ -2,9 +2,6 @@
   "name": "@skyagent/tui",
   "version": "2.0.0",
   "type": "module",
-  "bin": {
-    "skyagent-tui": "./src/bin.ts"
-  },
   "exports": {
     ".": "./src/index.tsx"
   },
@@ -13,11 +10,10 @@
   },
   "dependencies": {
     "@skyagent/core": "workspace:*",
-    "@skyagent/gateway": "workspace:*",
-    "ink": "^7.1.0",
-    "react": "^19.2.7"
+    "ink": "7.1.0",
+    "react": "19.2.7"
   },
   "devDependencies": {
-    "@types/react": "^19.2.17"
+    "@types/react": "19.2.17"
   }
 }

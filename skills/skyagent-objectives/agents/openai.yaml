@@ -1,7 +1,0 @@
-interface:
-  display_name: "SkyAgent Objectives"
-  short_description: "Track goals and buy lists."
-  default_prompt: "Use $skyagent-objectives to turn my SkyBlock plan into tracked tasks."
-policy:
-  allow_implicit_invocation: true
-

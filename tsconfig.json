@@ -10,30 +10,20 @@
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,
     "skipLibCheck": true,
-    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@skyagent/cli": [
         "packages/cli/src/index.ts"
       ],
       "@skyagent/core": [
-        "packages/core/src/index.ts",
-        ".codex-plugin/runtime/modules/node_modules/@skyagent/core/index.ts"
+        "packages/core/src/index.ts"
       ],
       "@skyagent/core/*": [
         "packages/core/src/*.ts",
-        "packages/core/src/*/index.ts",
-        ".codex-plugin/runtime/modules/node_modules/@skyagent/core/*.ts"
-      ],
-      "@skyagent/gateway": [
-        "packages/gateway/src/index.ts"
-      ],
-      "@skyagent/gateway/manager": [
-        "packages/gateway/src/manager.ts"
+        "packages/core/src/*/index.ts"
       ],
       "@skyagent/mcp": [
-        "packages/mcp/src/index.ts",
-        ".codex-plugin/runtime/modules/node_modules/@skyagent/mcp/index.ts"
+        "packages/mcp/src/index.ts"
       ],
       "@skyagent/tui": [
         "packages/tui/src/index.tsx"
@@ -42,7 +32,6 @@
         "packages/web/src/main.tsx"
       ],
       "prismarine-nbt": [
-        ".codex-plugin/runtime/modules/node_modules/prismarine-nbt/nbt.js",
         "node_modules/prismarine-nbt/nbt.js"
       ]
     },

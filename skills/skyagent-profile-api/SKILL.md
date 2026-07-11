@@ -13,14 +13,14 @@ Use this skill when the task is primarily about finding the right player, profil
 
 ## Tool Routing
 
-- Start with `skyagent_start` through `$skyagent-context-engine` for fresh session-scale profile work or when the user does not provide a player/profile; it should use configured identity/profile before asking for a username.
+- Start with `skyagent_context_get` through `$skyagent-context-engine` for fresh session-scale profile work or when the user does not provide a player/profile; it should use configured identity/profile before asking for a username.
 - Use `skyagent_config_get` only when setup metadata is needed without loading startup/context.
-- Use CLI `skyagent setup status --json` to inspect local setup state, and `skyagent setup --json` for resumable first-run bootstrap when MCP config tools are not enough.
+- Use `agents packages run skyagent -- setup status --json` to inspect local setup state, and `agents packages run skyagent -- setup --json` for resumable first-run profile setup.
 - Use `minecraft_resolve_username` for names that need UUIDs.
 - Use `skyagent_server_status` when the user asks whether a player is online, active, in SkyBlock, or when Hypixel API availability and provider warnings matter. Use raw `hypixel_status` only when the official payload itself is requested.
 - Use `skyblock_profiles` or `skyblock_profiles_summary` before profile-specific work.
-- Use `skyagent_context_bootstrap` or `skyagent_context_get` before broad profile reasoning when `skyagent_start` has not already provided compact identity, economy, gear, pets, accessories, readiness, objective summary, provider freshness, warnings, and follow-up tool links.
-- Use `skyagent_context_events`, `skyagent_context_watch`, and `skyagent_context_event_emit` to read or add context-stream events for progress, provider/cache changes, profile refreshes, or future live telemetry handoff.
+- Use `skyagent_context_get` or `skyagent_context_get` before broad profile reasoning when `skyagent_context_get` has not already provided compact identity, economy, gear, pets, accessories, readiness, objective summary, provider freshness, warnings, and follow-up tool links.
+- Use `skyagent_context_events`, `skyagent_context_events`, and `skyagent_context_event_emit` to read or add context-stream events for progress, provider/cache changes, profile refreshes, or future live telemetry handoff.
 - Route full session bootstrap and profile context caching to `$skyagent-context-engine`.
 - Route live progress, server-status change history, context watch, and event emission to `$skyagent-live-progress`.
 - Route durable goal, todo, buy-list, source-list, or snipe-target state to `$skyagent-objectives`.
@@ -36,8 +36,8 @@ Use this skill when the task is primarily about finding the right player, profil
 - Prefer live Hypixel API data over assumptions.
 - Preserve rate-limit metadata and selected profile details in summaries.
 - Do not print or store API key values.
-- Prefer `HYPIXEL_API_KEY`; use local config only when it is already explicitly set.
-- Prefer `skyagent setup` over direct config writes for first-run username, UUID, API key, and profile selection because it validates the player/profile flow and redacts secrets.
+- Read authentication only from the canonical Agent OS `HYPIXEL_API_KEY` secret.
+- Prefer the canonical SkyAgent setup command over direct config writes for first-run username, UUID, and profile selection.
 - If the API key is absent, report `api_disabled` and use only public/no-key tools.
 - If a requested profile is missing, report `missing_profile`, list available profile IDs and cute names, then ask for a new selector.
 - If a selected profile has no member for the resolved UUID, report `missing_member` and stop before deeper analysis.

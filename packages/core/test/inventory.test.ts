@@ -93,7 +93,7 @@ describe("inventory extraction", () => {
     expect((section as any).decoded.i[0].tag.ExtraAttributes.id).toBe("ASPECT_OF_THE_END");
   });
 
-  test("extracts legacy member-level sections", async () => {
+  test("extracts older Hypixel member-level sections", async () => {
     const section = await inventorySectionFromMember({
       inv_contents: { data: payload([item(0, "minecraft:stick", "ASPECT_OF_THE_END")]) },
     }, "inventory");
@@ -103,7 +103,7 @@ describe("inventory extraction", () => {
     expect(section.items[0].internalId).toBe("ASPECT_OF_THE_END");
   });
 
-  test("extracts legacy misspelled equipment sections", async () => {
+  test("extracts the older misspelled Hypixel equipment field", async () => {
     const section = await inventorySectionFromMember({
       equippment_contents: { data: payload([item(0, "minecraft:leather_boots", "SHADOW_ASSASSIN_BOOTS")]) },
     }, "equipment");
@@ -397,7 +397,7 @@ describe("inventory extraction", () => {
     }));
   });
 
-  test("extracts legacy pet records with stable fields", async () => {
+  test("extracts older Hypixel pet records with stable fields", async () => {
     const section = await inventorySectionFromMember({
       pets: [
         { type: "ROCK", tier: "RARE", exp: 10, active: false, held_item: "PET_ITEM_IRON_CLAWS", skin: "COBBLESTONE", candy_used: 1 },

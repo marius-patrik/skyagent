@@ -1,6 +1,0 @@
-interface:
-  display_name: "Hypixel SkyBlock"
-  short_description: "Orchestrate SkyAgent profile analysis."
-  default_prompt: "Use $hypixel-skyblock to start SkyAgent with skyagent_start, load my SkyBlock context, and route to the right subskill."
-policy:
-  allow_implicit_invocation: true
